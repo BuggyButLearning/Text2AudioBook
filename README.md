@@ -1,5 +1,6 @@
 
 # Text2AudioBook
+![Text2Audio_banner](https://github.com/BuggyButLearning/Text2AudioBook/assets/162375864/65bf72b0-86b5-48a8-a7fb-f89354f61907)
 
 ## Project Summary
 
