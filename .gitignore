@@ -1,0 +1,10 @@
+.conda/
+.pytest_cache/
+__pycache__/
+*.pyc
+output/
+key.txt
+tmp/
+*.mp3
+*.wav
+.paul/phases/**/00-02-pytest.log

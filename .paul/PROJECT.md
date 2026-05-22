@@ -1,0 +1,158 @@
+# Text2AudioBook
+
+## What This Is
+
+Text2AudioBook is a small Windows-first Python desktop utility (Tkinter GUI) that converts plain text files into spoken audiobook-style MP3s, with an optional pipeline to combine MP3s into a static-image video. The current modernization effort migrates the legacy raw-HTTP OpenAI TTS integration to the official OpenAI SDK and introduces a provider abstraction so the same workflow can target multiple TTS backends — hosted (OpenAI) and local (Ollama, Kokoro-82M, VibeVoice-1.5B) — while improving chunking, reliability, configuration, and test coverage.
+
+## Core Value
+
+A non-technical user can drop a text file into a desktop app and get back a high-quality audiobook MP3 — choosing between hosted OpenAI TTS or fully local Apache-licensed models — without editing code, juggling API payloads, or worrying about chunking and retries.
+
+## Current State
+
+| Attribute | Value |
+|-----------|-------|
+| Type | Application |
+| Version | 0.0.0 |
+| Status | Phase 0 complete; Phase 1 (Architecture and Configuration) next |
+| Last Updated | 2026-05-21 |
+
+## Requirements
+
+### Core Features
+
+- Convert a text file to an audiobook-style MP3 via OpenAI TTS using the official SDK
+- Provider abstraction across OpenAI (hosted), Ollama, Kokoro-82M, and VibeVoice-1.5B (local)
+- Config-driven model and voice selection with quality presets (Best Quality / Balanced / Fast)
+- Robust chunking with paragraph/sentence-aware splitting and bounded-concurrency retries
+- Optional MP3→static-image video pipeline retained but isolated from the core flow
+
+### Validated (Shipped)
+- ✓ Modernization PRD drafted, audited, and approved (bulk: accept-all-defaults; 9 §14 decisions propagated; VibeVoice deferred to v0.2) — Phase 0
+- ✓ Baseline characterization test suite (101 tests, 0.77s; pytest.ini strict config; autouse network block; .gitignore credential protection + meta-test) — Phase 0
+- ✓ Conda env standard locked to named env `text2audiobook` (was `--prefix .conda`) — Phase 0
+
+### Active (In Progress)
+- [ ] Phase 1 — Architecture and Configuration (next up)
+
+### Planned (Next)
+- Phase 1: settings/config module + provider abstraction + key precedence
+- Phase 2: OpenAI SDK migration + retries + bounded concurrency
+- Phase 2A: OpenAI/Ollama model discovery + Refresh Models UI
+- Phase 3: improved text chunking
+- Phase 4: GUI progress/disable-while-running + validation messaging
+- Phase 5: audio/video pipeline cleanup
+- Phase 6: Ollama local provider
+- Phase 6B: Kokoro-82M local provider (recommended local default)
+- Phase 6C: VibeVoice-1.5B local provider (opt-in, GPU-only, research-license)
+- Phase 7: tests, smoke tests, README/docs
+
+### Out of Scope
+- Web app / SaaS conversion — out per PRD §3.2
+- Databases, user accounts, authentication, cloud sync — out per PRD §3.2
+- Plugin architecture — out per PRD §3.2
+- UI framework migration off Tkinter — out per PRD §3.2
+- Heavy NLP dependencies without clear justification — out per PRD §3.2
+- Stripping or muting upstream-baked safety artifacts (VibeVoice watermark + audible AI disclaimer) — architecturally prohibited
+- VibeVoice-1.5B provider (Phase 6.3) — **deferred to v0.2** per §14.2(1) decision 2026-05-21 (no GPU assumed in v0.1 target machines)
+- Multi-speaker scripting UX — **deferred to v0.2** per §14.2(5) decision 2026-05-21 (tied to Phase 6.3 deferral)
+
+## Target Users
+
+**Primary:** Individual creators converting text into audiobook-style audio
+- Prefer a desktop GUI over scripts/CLI
+- Want a simple OpenAI TTS workflow without editing code
+- May want a fully-local Apache-licensed option (Kokoro) to avoid per-character API costs
+- Windows-first environment
+
+**Secondary:** Small-scale content producers experimenting with multi-speaker/long-form output via VibeVoice (research/dev use only)
+
+## Context
+
+**Business Context:**
+Solo-developer hobby/utility project. No commercial distribution model yet. The VibeVoice provider is upstream-restricted to research/development use, which constrains how that path can be presented and used.
+
+**Technical Context:**
+Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_conversion.py`, `combine_and_convert.py`, `settings.py`. Conda environment lives at `.conda/` per CONDA_ENV_RULE.md. Currently uses raw `requests.post()` against `/v1/audio/speech` and hardcodes `tts-1`; needs SDK migration. `key.txt` API key file exists as a legacy fallback.
+
+## Constraints
+
+### Technical Constraints
+- Windows-first desktop runtime; conda-managed Python 3.11 environment at `.conda/`
+- Keep dependency footprint light; gate heavy deps (`torch`, `transformers`) behind optional extras
+- Kokoro provider requires `espeak-ng` as a system dependency (Windows: `.msi` installer; Linux: `apt`)
+- VibeVoice provider requires a CUDA-capable GPU with enough VRAM for ~3B-param BF16 model (~6 GB download)
+- Pin HuggingFace model revisions/commit hashes to prevent silent model swaps
+- Do not strip, alter, or disable VibeVoice's upstream audible AI disclaimer or imperceptible watermark
+- Bounded concurrency required; default 1 for local GPU/CPU-bound providers
+
+### Business Constraints
+- VibeVoice upstream license: research/development use only — must surface to user before first download
+- Real OpenAI smoke tests must stay under $1 per validation run and under 5 minutes runtime (PRD §14.1)
+- No GitHub attribution to Claude per global rule
+
+### Compliance Constraints
+- VibeVoice safety artifacts (watermark + audible disclaimer) must remain in output
+
+## Key Decisions
+
+| Decision | Rationale | Date | Status |
+|----------|-----------|------|--------|
+| Keep Tkinter UI; modernize behavior under the hood | Stakeholder approved minimal UX disruption (PRD §7.1) | 2026-05-21 | Active |
+| Prefer `OPENAI_API_KEY` env var with `key.txt` as fallback | Modernize credential loading without breaking existing users (PRD §FR-2) | 2026-05-21 | Active |
+| Provider abstraction with four providers: OpenAI / Ollama / Kokoro / VibeVoice | Enable local + hosted flows behind one config surface (PRD §FR-1A) | 2026-05-21 | Active |
+| Kokoro-82M as recommended local default; VibeVoice as opt-in GPU-only path | Apache 2.0 license + CPU-capable + audiobook-narrator fit; VibeVoice restricted to research/dev | 2026-05-21 | Active |
+| Pin HF model revisions in settings | Prevent silent upstream model swaps from breaking pipeline | 2026-05-21 | Active |
+| Real smoke tests bounded at <$1 / <5 min | Stakeholder budget for ongoing validation runs (PRD §14.1) | 2026-05-21 | Active |
+| Keep MP3→video pipeline in active scope but isolated | Stakeholder approved video as secondary feature (PRD §FR-7) | 2026-05-21 | Active |
+| Use conda env named `text2audiobook` (`conda activate text2audiobook`) for all commands | Per CONDA_ENV_RULE.md; do not use base interpreter or the legacy `--prefix .conda` form | 2026-05-21 | Active |
+| §14.1(a) Ollama behavior: query local API, validate capabilities, warn/block unsupported models | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.1(b) OpenAI discovery: dynamic listing with allowlist filter to known TTS models | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.1(c) Real smoke test budget: <$1 per run, <5 min total | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(1) Phase 6.3 VibeVoice deferred from v0.1 to v0.2 | No GPU assumed in v0.1 target machines (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(2) VibeVoice research/dev license accepted with first-run opt-in + no shipped weights | Pre-approved position for v0.2 (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(3) Disk budget: Kokoro ~500 MB in v0.1; VibeVoice ~6 GB only when Phase 6.3 enabled (v0.2) | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(4) HF cache: default `~/.cache/huggingface`; `HF_HOME` env override exposed | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(5) Multi-speaker scripting deferred to v0.2 | Tied to Phase 6.3 deferral (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| §14.2(6) Default provider: OpenAI hosted; Kokoro offline | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+
+## Success Metrics
+
+| Metric | Target | Current | Status |
+|--------|--------|---------|--------|
+| OpenAI SDK migration | TTS path runs via official SDK, no raw `requests.post` to `/v1/audio/speech` | Not started | Not started |
+| Provider parity | OpenAI + Kokoro paths both produce playable MP3 from same text input | Not started | Not started |
+| Test coverage on deterministic logic | Unit tests cover chunking, config precedence, provider dispatch, retry decision logic | None | Not started |
+| Real OpenAI smoke test | <$1 cost, <5 min runtime, produces valid MP3 | Not run | Not started |
+| VibeVoice safety artifacts preserved | Audible disclaimer + watermark present in 100% of sampled outputs | Not run | Not started |
+| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 0 / 10 | Not started |
+
+## Tech Stack / Tools
+
+| Layer | Technology | Notes |
+|-------|------------|-------|
+| Runtime | Python 3.11 (conda) | Env name `text2audiobook` (per `environment.yml`); activate with `conda activate text2audiobook` |
+| GUI | Tkinter + `ttkbootstrap>=1.10.1` | Keep existing single-window layout |
+| Hosted TTS | `openai>=1.0.0` (official SDK) | Migrating off raw `requests.post` |
+| Audio merge | `pydub>=0.25.1` | + `ffmpeg` system dep (conda-forge) |
+| Test runner | `pytest>=8.0.0` (+ optional `pytest-mock`) | Mocks for API, fixtures for filesystem |
+| Local TTS — Ollama | local HTTP API at `http://localhost:11434` | Currently uses `requests`; model discovery via `/api/tags` |
+| Local TTS — Kokoro | `kokoro>=0.9.4`, `soundfile`, `huggingface_hub` | Apache 2.0; needs `espeak-ng` system dep |
+| Local TTS — VibeVoice | `transformers`, `torch`, `accelerate`, `huggingface_hub` | MIT weights, research-only license; GPU required; ~6 GB |
+| Video (optional) | `moviepy` (under re-evaluation) | May replace parts with FFmpeg calls |
+| Config | `config.json` + env vars (`OPENAI_API_KEY`, `OLLAMA_BASE_URL`, `TTS_MAX_CONCURRENCY`) | Precedence: UI > env > config file > code defaults |
+
+## Links
+
+| Resource | URL |
+|----------|-----|
+| Repository | (local) c:\Users\ME\Documents\Projects\Text2AudioBook |
+| PRD | MODERNIZATION_PRD.md |
+| Conda env rule | CONDA_ENV_RULE.md |
+| Research notes (TTS) | tmp/hf_tts_research_notes.md |
+| Kokoro model card | https://huggingface.co/hexgrad/Kokoro-82M |
+| VibeVoice model card | https://huggingface.co/microsoft/VibeVoice-1.5B |
+
+---
+*PROJECT.md — Updated when requirements or context change*
+*Last updated: 2026-05-21 after Phase 0*
