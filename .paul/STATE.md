@@ -50,13 +50,17 @@ Phase 0: ✅ Complete · Phase 1: ✅ Complete (01-01 PLAN ✓ APPLY ✓ UNIFY �
 | Phase 0 transition complete 2026-05-21: PROJECT.md "Validated (Shipped)" promoted with 3 entries; ROADMAP Phase 0 marked Complete; paul.json advanced to phase 1; git commit `a4d0be6` created locally (not pushed) | Phase 0 → Phase 1 | First milestone progress: 1/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
 | 01-01 audited 2026-05-21: verdict conditionally acceptable; 3 must-have + 5 strongly-recommended upgrades applied; 3 deferred | Phase 1 | M1 fail-fast regex compile + revision schema validation; M2 single source of truth (no HF SHA duplication); M3 MappingProxyType immutable registry; S1 MILESTONE constant; S3 frozen-dataclass mutation test; S4 ast no-new-deps test; S5 monkeypatch pattern demo. AUDIT.md preserved at `.paul/phases/01-architecture-and-configuration/01-01-AUDIT.md` |
 | 01-01 applied 2026-05-21: providers.py contract layer live; settings.py extended additively; conftest sys.path hack removed (00-02 D3 closes); 145 tests passing in 0.77s | Phase 1 | Single-source-of-truth registry now available for Phase 2 wiring; v0.1 milestone guardrails in code (MILESTONE constant, immutable registry, ast no-new-deps check) |
+| Phase 1 transition complete 2026-05-21: PROJECT.md gained 3 "Validated (Shipped)" entries; ROADMAP Phase 1 marked Complete; paul.json advanced to phase 2; git commit `5cead5c` created locally (not pushed) | Phase 1 → Phase 2 | Milestone progress: 2/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
+| Pre-PAUL modernization edits committed 2026-05-21 as `f2ff098`: tts_conversion SDK migration + Ollama discovery + retries; text_processing paragraph/sentence-aware chunking; main.py ttkbootstrap GUI + provider/quality/voice dropdowns; combine_and_convert ffmpeg GPU-aware; requirements pinned | Phase 1 → Phase 2 | Phase 2 (and partially 3/4/5) baseline now in HEAD. Phase 2 plan can focus on integrating providers.py registry into the already-migrated SDK code rather than from-scratch refactor. Regression net still 145/145 green after the commit. |
 
 ### Git State
-Last Phase 0 commit: `a4d0be6` — feat(00-discovery-and-approval): close Phase 0 with PRD approval and characterization tests
+Last commit: `f2ff098` — chore(pre-paul): land in-progress modernization edits as Phase 2-5 baseline
+Phase 1 commit: `5cead5c` — feat(01-architecture-and-configuration): close Phase 1 with provider abstraction contracts
+Phase 0 commit: `a4d0be6` — feat(00-discovery-and-approval): close Phase 0 with PRD approval and characterization tests
 Branch: main
 Feature branches merged: none
-Push status: not pushed (HITL required)
-Pre-existing dirty source files NOT in commit: README.md, combine_and_convert.py, main.py, requirements.txt, text_processing.py, tts_conversion.py — owned by user.
+Push status: not pushed (HITL required for git push)
+Working tree: clean except IDE noise (.vscode/, test_tracking/.vscode.configs.import.cspell.config.json) — neither is in scope for any active phase.
 
 ### Deferred Issues
 
@@ -74,13 +78,13 @@ Pre-existing dirty source files NOT in commit: README.md, combine_and_convert.py
 
 | Blocker | Impact | Resolution Path |
 |---------|--------|-----------------|
-| (none — all Phase 0 blockers resolved 2026-05-21) | — | PRD approved; §14.2(1)/(2) resolved by deferring Phase 6.3 to v0.2 |
+| (none — pre-PAUL dirty state landed as `f2ff098`; working tree clean) | — | Phase 2 PLAN can proceed against clean HEAD |
 
 ## Session Continuity
 
 Last session: 2026-05-21
-Stopped at: Phase 1 complete; ready to plan Phase 2 (TTS Engine Modernization).
-Next action: `/paul:plan` for Phase 2.
+Stopped at: Pre-PAUL modernization edits committed as `f2ff098`. Working tree clean. Phase 2 unblocked.
+Next action: `/paul:plan` for Phase 2 (TTS Engine Modernization), scoped to integrate providers.py registry into the already-SDK-migrated tts_conversion.py.
 Resume file: .paul/ROADMAP.md
 
 ---
