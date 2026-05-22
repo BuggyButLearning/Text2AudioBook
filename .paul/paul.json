@@ -7,8 +7,8 @@
     "status": "in_progress"
   },
   "phase": {
-    "number": 2.1,
-    "name": "Model Discovery and Selection",
+    "number": 3,
+    "name": "Text Processing Improvements",
     "status": "ready_to_plan"
   },
   "loop": {

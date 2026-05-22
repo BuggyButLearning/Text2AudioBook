@@ -14,7 +14,7 @@ A non-technical user can drop a text file into a desktop app and get back a high
 |-----------|-------|
 | Type | Application |
 | Version | 0.0.0 |
-| Status | Phases 0 + 1 + 2 complete; Phase 2.1 (Model Discovery and Selection) next |
+| Status | Phases 0 + 1 + 2 + 2.1 complete; Phase 3 (Text Processing Improvements) next |
 | Last Updated | 2026-05-21 |
 
 ## Requirements
@@ -37,9 +37,12 @@ A non-technical user can drop a text file into a desktop app and get back a high
 - ✓ `tts_conversion.py` rewired to consume `providers.PROVIDER_REGISTRY` (module-level compiled regex constants; no inline capability duplication); `settings.OPENAI_FALLBACK_MODELS` ↔ registry consistency invariant locked by test — Phase 2
 - ✓ OpenAI SDK migrated to non-deprecated `client.audio.speech.with_streaming_response.create(...)` context manager; zero DeprecationWarning in regression run; explicit `catch_warnings` test proves contract — Phase 2
 - ✓ Per-provider concurrency clamp with three-branch policy-explicit logging (clamped / under-cap-local / hosted); structured chunk-level logging (provider/model/voice/attempt/elapsed) with api_key + full-chunk-text redaction; `_safe_status_callback` isolates UI failures from synthesis retry budget; regression net expanded 145 → 161 tests (+16 across `TestConcurrencyClamp`, `TestWithStreamingResponse`, `TestChunkLogging`, `TestStatusCallbackIsolation`, fallback-consistency + non-string-input tests) — Phase 2
+- ✓ `model_discovery.py` module: frozen `DiscoveryResult` + `Source` enum (LIVE/FALLBACK/EMPTY); `discover_models` with `use_cache` + per-(provider, canonical-identity) cache; explicit `invalidate_cache(provider=None)` entry point for Phase 4's "Refresh Models" button; `_scrub_api_key` redacts credentials from discovery error logs + DiscoveryResult.error — Phase 2.1
+- ✓ Ollama curated allowlist filter live (PRD §14.1(a)): registry pattern hides non-TTS models (llama3, mistral) from the discovery dropdown; canonical URL normalization in cache key (None ≡ default ≡ trailing-slash) — Phase 2.1
+- ✓ Back-compat shims in `tts_conversion.py` preserve `list_openai_models` / `list_ollama_models` / `list_available_models` imports for main.py; regression net expanded 161 → 179 tests (+18 in new `test_model_discovery.py`); main.py untouched — Phase 2.1
 
 ### Active (In Progress)
-- [ ] Phase 2.1 — Model Discovery and Selection (next up)
+- [ ] Phase 3 — Text Processing Improvements (next up)
 
 ### Planned (Next)
 - Phase 1: settings/config module + provider abstraction + key precedence
@@ -125,6 +128,11 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Phase 2: OpenAI SDK uses `with_streaming_response.create(...)` context manager; non-streaming `create()` actively asserted against in tests | Eliminates DeprecationWarning + future-proofs against openai 3.x removal of `response.stream_to_file()` direct call | 2026-05-21 | Active |
 | Phase 2: Local-provider concurrency clamped at registry default; hosted honors user-requested value; clamp event always logged with explicit policy message | Local synthesis is memory-bound; hosted is rate-limit-bound — split policy correctly. Auditor sees clamp decisions at a glance | 2026-05-21 | Active |
 | Phase 2: status_callback failures isolated via `_safe_status_callback` (logged WARNING, never abort chunk synthesis) | Realistic trigger is Tkinter "main thread not in main loop" after GUI close; UI bugs must not consume retry budget | 2026-05-21 | Active |
+| Phase 2.1: Discovery extracted into `model_discovery.py`; `tts_conversion.py` keeps thin shims preserving `main.py`'s import path | Discovery has distinct concerns (HTTP, cache, error reporting) from synthesis; Phase 4 GUI imports only the surface it needs | 2026-05-21 | Active |
+| Phase 2.1: FALLBACK and EMPTY discovery results are cached identically to LIVE; sticky-until-invalidate semantics | Predictable UX for a desktop app; "Refresh Models" is the only recovery path; no surprise refresh storms | 2026-05-21 | Active |
+| Phase 2.1: `Source.EMPTY` distinguishes "upstream responded but yielded nothing useful" from `Source.FALLBACK` (exception path) | Phase 4 GUI can route messaging correctly (red "down" banner vs yellow "no models" banner) | 2026-05-21 | Active |
+| Phase 2.1: Ollama discovery canonicalizes URL once; None ≡ default ≡ trailing-slash all collapse to one cache entry | Prevents drift between cache key and underlying network call | 2026-05-21 | Active |
+| Phase 2.1: `_scrub_api_key` redacts credentials from discovery error logs + DiscoveryResult.error | Discovery introduces new logging surface; Phase 2 set the synthesis-side invariant — Phase 2.1 propagates it to discovery | 2026-05-21 | Active |
 
 ## Success Metrics
 
@@ -135,7 +143,7 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Test coverage on deterministic logic | Unit tests cover chunking, config precedence, provider dispatch, retry decision logic | None | Not started |
 | Real OpenAI smoke test | <$1 cost, <5 min runtime, produces valid MP3 | Not run | Not started |
 | VibeVoice safety artifacts preserved | Audible disclaimer + watermark present in 100% of sampled outputs | Not run | Not started |
-| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 3 / 10 | In progress |
+| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 4 / 10 | In progress |
 
 ## Tech Stack / Tools
 
@@ -165,4 +173,4 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-05-21 after Phase 2*
+*Last updated: 2026-05-21 after Phase 2.1*

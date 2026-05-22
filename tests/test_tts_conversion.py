@@ -13,6 +13,15 @@ from tts_conversion import (
 )
 
 
+# Phase 2.1: shared discovery cache must be cleared between tests
+@pytest.fixture(autouse=True)
+def _clear_discovery_cache():
+    from model_discovery import invalidate_cache
+    invalidate_cache()
+    yield
+    invalidate_cache()
+
+
 class TestFilterOpenAITTSModels:
     def test_keeps_only_tts_models(self):
         result = _filter_openai_tts_models(["gpt-4", "tts-1", "whisper-1", "tts-1-hd"])
@@ -68,6 +77,8 @@ class TestValidateOllamaModelSupport:
 
 class TestListOllamaModels:
     def test_parses_models_from_api(self, monkeypatch):
+        import model_discovery
+
         class FakeResp:
             def raise_for_status(self):
                 return None
@@ -75,18 +86,23 @@ class TestListOllamaModels:
             def json(self):
                 return {"models": [{"name": "bark"}, {"name": "kokoro"}, {"name": "bark"}]}
 
-        monkeypatch.setattr(tts_conversion.requests, "get", lambda *_a, **_kw: FakeResp())
+        monkeypatch.setattr(model_discovery.requests, "get", lambda *_a, **_kw: FakeResp())
         result = list_ollama_models("http://localhost:11434")
         assert result == ["bark", "kokoro"]
 
     def test_returns_empty_on_http_error(self, monkeypatch):
+        import model_discovery
+
         def boom(*_a, **_kw):
             raise RuntimeError("connection refused")
 
-        monkeypatch.setattr(tts_conversion.requests, "get", boom)
+        monkeypatch.setattr(model_discovery.requests, "get", boom)
         assert list_ollama_models("http://localhost:11434") == []
 
     def test_skips_malformed_entries(self, monkeypatch):
+        # CHARACTERIZED — Phase 2.1: registry pattern filters non-TTS names; "ok" no longer survives the allowlist filter.
+        import model_discovery
+
         class FakeResp:
             def raise_for_status(self):
                 return None
@@ -94,22 +110,47 @@ class TestListOllamaModels:
             def json(self):
                 return {"models": [{"name": "ok"}, "not-a-dict", {"no_name": "x"}]}
 
-        monkeypatch.setattr(tts_conversion.requests, "get", lambda *_a, **_kw: FakeResp())
-        assert list_ollama_models("http://localhost:11434") == ["ok"]
+        monkeypatch.setattr(model_discovery.requests, "get", lambda *_a, **_kw: FakeResp())
+        # Pre-Phase-2.1: ["ok"] passed because there was no filter. Post-Phase-2.1: empty.
+        assert list_ollama_models("http://localhost:11434") == []
+
+    def test_filter_keeps_tts_names_skips_others(self, monkeypatch):
+        import model_discovery
+
+        class FakeResp:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"models": [{"name": "bark"}, {"name": "ok"}, {"name": "kokoro"}, {"name": "llama3"}]}
+
+        monkeypatch.setattr(model_discovery.requests, "get", lambda *_a, **_kw: FakeResp())
+        assert list_ollama_models("http://localhost:11434") == ["bark", "kokoro"]
 
 
 class TestListAvailableModels:
     def test_routes_to_ollama_when_provider_is_ollama(self, monkeypatch):
-        called = {}
+        # CHARACTERIZED — Phase 2.1: routing logic moved into model_discovery.discover_models.
+        # Old test patched tts_conversion.list_ollama_models (no longer the dispatch layer).
+        # New layer to patch: model_discovery.requests.get (Ollama is HTTP-based).
+        import model_discovery
+        captured = {}
 
-        def fake_ollama(base_url):
-            called["url"] = base_url
-            return ["bark"]
+        class FakeResp:
+            def raise_for_status(self_inner):
+                return None
 
-        monkeypatch.setattr(tts_conversion, "list_ollama_models", fake_ollama)
+            def json(self_inner):
+                return {"models": [{"name": "bark"}]}
+
+        def fake_get(url, *_a, **_kw):
+            captured["url"] = url
+            return FakeResp()
+
+        monkeypatch.setattr(model_discovery.requests, "get", fake_get)
         result = list_available_models("Ollama", api_key=None, ollama_base_url="http://x:1")
         assert result == ["bark"]
-        assert called["url"] == "http://x:1"
+        assert captured["url"] == "http://x:1/api/tags"
 
     def test_routes_to_openai_otherwise(self, monkeypatch):
         # AUDIT M2: deferred import; patch openai.OpenAI at source module.

@@ -2,12 +2,10 @@ import logging
 import re
 import time
 import warnings  # noqa: F401  (kept for parity with deprecation-warning test scaffolding)
-import requests
 from pydub import AudioSegment
 from concurrent.futures import ThreadPoolExecutor
 
 import providers
-from settings import OPENAI_FALLBACK_MODELS
 
 
 _OPENAI_MODEL_RE = re.compile(providers.PROVIDER_REGISTRY["OpenAI"].model_pattern)
@@ -21,38 +19,18 @@ def _filter_openai_tts_models(model_ids):
 
 
 def list_openai_models(api_key=None):
-    try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key) if api_key else OpenAI()
-        models = client.models.list()
-        model_ids = [model.id for model in models.data]
-        return _filter_openai_tts_models(model_ids)
-    except Exception as exc:
-        logging.warning("Falling back to built-in OpenAI model list: %s", exc)
-        return OPENAI_FALLBACK_MODELS.copy()
+    from model_discovery import discover_models
+    return list(discover_models("OpenAI", api_key=api_key).models)
 
 
 def list_ollama_models(base_url):
-    try:
-        response = requests.get(f"{base_url.rstrip('/')}/api/tags", timeout=10)
-        response.raise_for_status()
-        payload = response.json()
-        models = payload.get("models", [])
-        names = []
-        for model in models:
-            if isinstance(model, dict) and model.get("name"):
-                names.append(model["name"])
-        return sorted(set(names))
-    except Exception as exc:
-        logging.warning("Failed to load Ollama models: %s", exc)
-        return []
+    from model_discovery import discover_models
+    return list(discover_models("Ollama", ollama_base_url=base_url).models)
 
 
 def list_available_models(provider, api_key=None, ollama_base_url="http://localhost:11434"):
-    if provider == "Ollama":
-        return list_ollama_models(ollama_base_url)
-    return list_openai_models(api_key)
+    from model_discovery import discover_models
+    return list(discover_models(provider, api_key=api_key, ollama_base_url=ollama_base_url).models)
 
 
 def _write_openai_speech(chunk, file_path, api_key, model, voice, speed=1.0, response_format="mp3"):
