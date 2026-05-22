@@ -62,6 +62,37 @@ This project is a GUI-based application designed to convert text files into spee
 
 ## Installation and Setup
 
+## Required Environment Rule
+
+This project must be developed and tested inside the conda environment **`text2audiobook`** (defined in `environment.yml`).
+
+Create it once:
+
+```sh
+conda env create --file environment.yml
+```
+
+Or update it after `environment.yml` changes:
+
+```sh
+conda env update --name text2audiobook --file environment.yml --prune
+```
+
+Activate for a session:
+
+```sh
+conda activate text2audiobook
+```
+
+Once activated, run the application and tests with plain `python`:
+
+```sh
+python main.py
+python -m pytest tests
+```
+
+For single-shot use without activation, substitute `conda run --name text2audiobook ...` for the `python ...` portion.
+
 ### Step 1: Install Python Dependencies
 
 Install the required Python libraries using pip:

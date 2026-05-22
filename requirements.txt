@@ -1,4 +1,5 @@
-requests
-pydub
-openai
-moviepy
+openai>=1.0.0
+requests>=2.31.0
+pydub>=0.25.1
+pytest>=8.0.0
+ttkbootstrap>=1.10.1

@@ -3,10 +3,11 @@ from tkinter import filedialog, messagebox
 from pathlib import Path
 import json
 from pydub import AudioSegment
-from moviepy.editor import ImageClip, AudioFileClip, VideoFileClip
 import os
 import subprocess
 import logging
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import BOTH, DISABLED, SECONDARY, SUCCESS, W
 
 CONFIG_FILE = "config.json"
 
@@ -49,47 +50,107 @@ def scale_video(input_file, output_file, max_height=4096):
         logging.error(f"Error scaling video: {e}")
         raise
 
+
+def get_media_height(input_file):
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=height",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(input_file),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        value = result.stdout.strip()
+        return int(value) if value else None
+    except Exception:
+        return None
+
+
 # Function to create a video file from the combined audio and an image
 def create_video(audio_file, image_file, output_file, fps=24, max_height=4096):
-    audio_clip = AudioFileClip(str(audio_file))
-    video_clip = ImageClip(image_file).set_duration(audio_clip.duration).set_fps(fps)
-    video_clip = video_clip.set_audio(audio_clip)
-
     use_gpu = is_gpu_encoding_available()
-
-    # Check if video needs scaling
     video_scaled_file = None
-    try:
-        video_clip = VideoFileClip(image_file)
-        if video_clip.size[1] > max_height:
-            logging.debug(f"Video height {video_clip.size[1]} exceeds max height {max_height}, scaling required.")
-            video_scaled_file = Path(output_file).with_suffix(".scaled.mp4")
-            scale_video(image_file, video_scaled_file, max_height)
-            image_file = video_scaled_file
-    except Exception as e:
-        logging.error(f"Error checking/scaling video resolution: {e}")
+    height = get_media_height(image_file)
+    if height and height > max_height:
+        logging.debug(f"Image/video height {height} exceeds max height {max_height}, scaling required.")
+        video_scaled_file = Path(output_file).with_suffix(".scaled.mp4")
+        scale_video(image_file, video_scaled_file, max_height)
+        image_file = video_scaled_file
 
     try:
-        video_clip.write_videofile(
-            str(output_file),
-            codec='h264_nvenc' if use_gpu else 'libx264',
-            audio_codec='aac',
-            fps=fps,
-            preset='fast'
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loop",
+                "1",
+                "-i",
+                str(image_file),
+                "-i",
+                str(audio_file),
+                "-c:v",
+                'h264_nvenc' if use_gpu else 'libx264',
+                "-tune",
+                "stillimage",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-pix_fmt",
+                "yuv420p",
+                "-shortest",
+                "-r",
+                str(fps),
+                str(output_file),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except Exception as e:
         logging.error(f"Video encoding failed. Error: {e}")
         messagebox.showerror("Error", f"Video encoding failed. Error: {e}")
-        if "No NVENC capable devices found" in str(e):
-            logging.error("Ensure your NVIDIA drivers are correctly installed and your GPU supports NVENC.")
-        logging.info("Falling back to CPU encoding.")
-        video_clip.write_videofile(
-            str(output_file),
-            codec='libx264',
-            audio_codec='aac',
-            fps=fps,
-            preset='fast'
-        )
+        if use_gpu:
+            logging.info("Falling back to CPU encoding.")
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-loop",
+                    "1",
+                    "-i",
+                    str(image_file),
+                    "-i",
+                    str(audio_file),
+                    "-c:v",
+                    "libx264",
+                    "-tune",
+                    "stillimage",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-shortest",
+                    "-r",
+                    str(fps),
+                    str(output_file),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
     finally:
         if video_scaled_file and video_scaled_file.exists():
             os.remove(video_scaled_file)
@@ -191,49 +252,56 @@ def clear_fields():
     folder_entry.delete(0, tk.END)
     output_name_entry.delete(0, tk.END)
 
-# Create GUI
-root = tk.Tk()
-root.title("Combine MP3s and Convert to Video")
+def create_app():
+    global root, frame, listbox_frame, scrollbar, listbox, image_entry, folder_entry, output_name_entry
 
-frame = tk.Frame(root, padx=10, pady=10)
-frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+    root = ttk.Window(themename="darkly")
+    root.title("Combine MP3s and Convert to Video")
+    root.geometry("760x520")
 
-# Create the Listbox with a scrollbar
-listbox_frame = tk.Frame(frame)
-listbox_frame.grid(row=0, column=0, columnspan=3, sticky=tk.NSEW)
+    frame = ttk.Frame(root, padding=18)
+    frame.pack(fill=BOTH, expand=True)
 
-scrollbar = tk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
-listbox = tk.Listbox(listbox_frame, selectmode=tk.SINGLE, width=50, height=10, yscrollcommand=scrollbar.set)
-scrollbar.config(command=listbox.yview)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    ttk.Label(frame, text="Audiobook Video Builder", font=("Segoe UI", 18, "bold")).grid(row=0, column=0, columnspan=3, sticky=W, pady=(0, 10))
+    ttk.Label(frame, text="Combine audio parts and generate a static-image video with FFmpeg.", bootstyle=SECONDARY).grid(row=1, column=0, columnspan=3, sticky=W, pady=(0, 12))
 
-# Configure grid to make the Listbox resizable
-frame.grid_rowconfigure(0, weight=1)
-frame.grid_columnconfigure(0, weight=1)
+    listbox_frame = ttk.Frame(frame)
+    listbox_frame.grid(row=2, column=0, columnspan=3, sticky="nsew")
 
-tk.Button(frame, text="Browse MP3 Files...", command=select_files).grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
-tk.Button(frame, text="Move Up", command=move_up).grid(row=1, column=1, padx=5, pady=5)
-tk.Button(frame, text="Move Down", command=move_down).grid(row=1, column=2, padx=5, pady=5, sticky=tk.E)
+    scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL)
+    listbox = tk.Listbox(listbox_frame, selectmode=tk.SINGLE, width=50, height=10, yscrollcommand=scrollbar.set, bg="#1f1f1f", fg="#f5f5f5", relief="flat", highlightthickness=0)
+    scrollbar.config(command=listbox.yview)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-tk.Label(frame, text="Select Background Image:").grid(row=2, column=0, sticky=tk.W)
-image_entry = tk.Entry(frame, width=50)
-image_entry.grid(row=2, column=1, padx=5, pady=5)
-tk.Button(frame, text="Browse...", command=select_image).grid(row=2, column=2, padx=5, pady=5)
+    frame.grid_rowconfigure(0, weight=1)
+    frame.grid_columnconfigure(0, weight=1)
 
-tk.Label(frame, text="Output Folder:").grid(row=3, column=0, sticky=tk.W)
-folder_entry = tk.Entry(frame, width=50)
-folder_entry.grid(row=3, column=1, padx=5, pady=5)
-tk.Button(frame, text="Browse...", command=select_output_folder).grid(row=3, column=2, padx=5, pady=5)
+    ttk.Button(frame, text="Browse MP3 Files", command=select_files, bootstyle=SECONDARY).grid(row=3, column=0, padx=5, pady=8, sticky=W)
+    ttk.Button(frame, text="Move Up", command=move_up, bootstyle=SECONDARY).grid(row=3, column=1, padx=5, pady=8)
+    ttk.Button(frame, text="Move Down", command=move_down, bootstyle=SECONDARY).grid(row=3, column=2, padx=5, pady=8, sticky="e")
 
-tk.Label(frame, text="Output File Name (without extension):").grid(row=4, column=0, sticky=tk.W)
-output_name_entry = tk.Entry(frame, width=50)
-output_name_entry.grid(row=4, column=1, padx=5, pady=5)
+    ttk.Label(frame, text="Background Image").grid(row=4, column=0, sticky=W, pady=6)
+    image_entry = ttk.Entry(frame, width=50)
+    image_entry.grid(row=4, column=1, padx=5, pady=6, sticky="ew")
+    ttk.Button(frame, text="Browse", command=select_image, bootstyle=SECONDARY).grid(row=4, column=2, padx=5, pady=6)
 
-tk.Button(frame, text="Start Conversion", command=start_conversion).grid(row=5, column=0, columnspan=2, pady=10)
-tk.Button(frame, text="Clear Fields", command=clear_fields).grid(row=5, column=2, pady=10)
+    ttk.Label(frame, text="Output Folder").grid(row=5, column=0, sticky=W, pady=6)
+    folder_entry = ttk.Entry(frame, width=50)
+    folder_entry.grid(row=5, column=1, padx=5, pady=6, sticky="ew")
+    ttk.Button(frame, text="Browse", command=select_output_folder, bootstyle=SECONDARY).grid(row=5, column=2, padx=5, pady=6)
 
-# Load the previous configuration if available
-load_config()
+    ttk.Label(frame, text="Output File Name").grid(row=6, column=0, sticky=W, pady=6)
+    output_name_entry = ttk.Entry(frame, width=50)
+    output_name_entry.grid(row=6, column=1, padx=5, pady=6, sticky="ew")
 
-root.mainloop()
+    ttk.Button(frame, text="Start Conversion", command=start_conversion, bootstyle=SUCCESS).grid(row=7, column=0, columnspan=2, pady=12, sticky="ew")
+    ttk.Button(frame, text="Clear Fields", command=clear_fields, bootstyle=SECONDARY).grid(row=7, column=2, pady=12)
+
+    load_config()
+    return root
+
+
+if __name__ == "__main__":
+    app = create_app()
+    app.mainloop()
