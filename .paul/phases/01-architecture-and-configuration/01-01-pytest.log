@@ -1,0 +1,11 @@
+........................................................................ [ 49%]
+........................................................................ [ 99%]
+.                                                                        [100%]
+============================ slowest 10 durations =============================
+0.43s call     tests/test_tts_conversion.py::TestListAvailableModels::test_routes_to_openai_otherwise
+0.02s call     tests/test_repo_hygiene.py::test_key_txt_not_tracked_by_git
+
+(8 durations < 0.005s hidden.  Use -vv to show these durations.)
+145 passed in 0.70s
+
+EXIT=0

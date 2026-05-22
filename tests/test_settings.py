@@ -183,3 +183,56 @@ class TestBuildRuntimeSettings:
     def test_unknown_quality_preset_falls_back_to_balanced(self, clean_env, no_key_file, isolated_config):
         s = build_runtime_settings(quality_preset="Nonexistent")
         assert s.model == QUALITY_PRESETS["Balanced"]["model"]
+
+
+class TestPhase1Additions:
+    """Audit S1 (M2/S1): single-source-of-truth checks for HF revisions, plus HF_HOME_DEFAULT + provider delegation."""
+
+    def test_hf_home_default_is_path(self):
+        import pathlib
+        assert isinstance(settings.HF_HOME_DEFAULT, pathlib.Path)
+
+    def test_hf_home_default_last_parts(self):
+        parts = settings.HF_HOME_DEFAULT.parts
+        assert parts[-2:] == (".cache", "huggingface")
+
+    def test_hf_model_revisions_derives_from_providers(self):
+        import providers
+        kokoro_rev = providers.PROVIDER_REGISTRY["Kokoro"].hf_model_revision
+        assert settings.HF_MODEL_REVISIONS["hexgrad/Kokoro-82M"] == kokoro_rev
+
+    def test_hf_model_revisions_dict_like_get(self):
+        assert settings.HF_MODEL_REVISIONS.get("nonexistent/repo") is None
+        assert settings.HF_MODEL_REVISIONS.get("hexgrad/Kokoro-82M") is not None
+
+    def test_hf_model_revisions_supports_iter_and_contains(self):
+        assert "hexgrad/Kokoro-82M" in settings.HF_MODEL_REVISIONS
+        keys = list(settings.HF_MODEL_REVISIONS)
+        assert "hexgrad/Kokoro-82M" in keys
+
+    def test_hf_model_revisions_supports_keys_values_items(self):
+        keys = list(settings.HF_MODEL_REVISIONS.keys())
+        values = list(settings.HF_MODEL_REVISIONS.values())
+        items = list(settings.HF_MODEL_REVISIONS.items())
+        assert keys
+        assert all(isinstance(v, str) and v for v in values)
+        assert items[0][0] in keys
+
+    def test_get_provider_capability_delegates_to_providers(self):
+        import providers
+        assert settings.get_provider_capability("OpenAI") is providers.get_provider_capability("OpenAI")
+
+    def test_no_hardcoded_hf_model_revisions_dict_literal_in_settings(self):
+        """Audit M2: settings.py must NOT define HF_MODEL_REVISIONS as a hardcoded dict literal."""
+        import ast
+        import pathlib
+        source = pathlib.Path(settings.__file__).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "HF_MODEL_REVISIONS":
+                        assert not isinstance(node.value, ast.Dict), (
+                            "HF_MODEL_REVISIONS must NOT be a hardcoded dict literal — "
+                            "it must derive from providers.PROVIDER_REGISTRY (audit M2)"
+                        )

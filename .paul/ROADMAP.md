@@ -7,8 +7,8 @@ Migrate the existing Tkinter-based text-to-audio utility from a raw-HTTP OpenAI 
 ## Current Milestone
 
 **v0.1 Modernization MVP** (v0.1.0)
-Status: In progress (Phase 0 complete; Phase 1 next)
-Phases: 1 of 11 complete (10 of 11 if VibeVoice's deferred Phase 6.3 excluded from the v0.1 count)
+Status: In progress (Phases 0 + 1 complete; Phase 2 next)
+Phases: 2 of 11 complete (2 of 10 active v0.1 phases — Phase 6.3 deferred to v0.2)
 
 ## Phases
 
@@ -21,8 +21,8 @@ Phases execute in numeric order.
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Discovery and Approval | 2 | Complete | 2026-05-21 |
-| 1 | Architecture and Configuration | TBD | Next up | - |
-| 2 | TTS Engine Modernization | TBD | Not started | - |
+| 1 | Architecture and Configuration | 1 | Complete | 2026-05-21 |
+| 2 | TTS Engine Modernization | TBD | Next up | - |
 | 2.1 | Model Discovery and Selection | TBD | Not started | - |
 | 3 | Text Processing Improvements | TBD | Not started | - |
 | 4 | GUI Reliability and UX | TBD | Not started | - |

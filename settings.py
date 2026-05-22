@@ -20,6 +20,8 @@ QUALITY_PRESETS = {
 }
 OPENAI_FALLBACK_MODELS = ["tts-1", "tts-1-hd"]
 
+HF_HOME_DEFAULT = Path.home() / ".cache" / "huggingface"
+
 
 @dataclass
 class RuntimeSettings:
@@ -119,3 +121,50 @@ def build_runtime_settings(
     if quality_preset in QUALITY_PRESETS:
         settings.speed = QUALITY_PRESETS[quality_preset]["speed"]
     return settings
+
+
+def get_provider_capability(name):
+    """Thin facade over providers.get_provider_capability — keep settings.py as the public config surface."""
+    import providers
+    return providers.get_provider_capability(name)
+
+
+def _hf_model_revisions():
+    import providers
+    return {
+        cap.hf_model_repo: cap.hf_model_revision
+        for cap in providers.PROVIDER_REGISTRY.values()
+        if cap.hf_model_repo and cap.hf_model_revision
+    }
+
+
+class _HFModelRevisionsView:
+    def __getitem__(self, key):
+        return _hf_model_revisions()[key]
+
+    def get(self, key, default=None):
+        return _hf_model_revisions().get(key, default)
+
+    def __contains__(self, key):
+        return key in _hf_model_revisions()
+
+    def __iter__(self):
+        return iter(_hf_model_revisions())
+
+    def keys(self):
+        return _hf_model_revisions().keys()
+
+    def values(self):
+        return _hf_model_revisions().values()
+
+    def items(self):
+        return _hf_model_revisions().items()
+
+    def __len__(self):
+        return len(_hf_model_revisions())
+
+    def __repr__(self):
+        return f"_HFModelRevisionsView({_hf_model_revisions()!r})"
+
+
+HF_MODEL_REVISIONS = _HFModelRevisionsView()

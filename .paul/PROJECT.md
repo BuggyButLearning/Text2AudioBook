@@ -14,7 +14,7 @@ A non-technical user can drop a text file into a desktop app and get back a high
 |-----------|-------|
 | Type | Application |
 | Version | 0.0.0 |
-| Status | Phase 0 complete; Phase 1 (Architecture and Configuration) next |
+| Status | Phases 0 + 1 complete; Phase 2 (TTS Engine Modernization) next |
 | Last Updated | 2026-05-21 |
 
 ## Requirements
@@ -31,9 +31,12 @@ A non-technical user can drop a text file into a desktop app and get back a high
 - ✓ Modernization PRD drafted, audited, and approved (bulk: accept-all-defaults; 9 §14 decisions propagated; VibeVoice deferred to v0.2) — Phase 0
 - ✓ Baseline characterization test suite (101 tests, 0.77s; pytest.ini strict config; autouse network block; .gitignore credential protection + meta-test) — Phase 0
 - ✓ Conda env standard locked to named env `text2audiobook` (was `--prefix .conda`) — Phase 0
+- ✓ `providers.py` immutable single-source-of-truth registry (3 providers: OpenAI / Ollama / Kokoro; VibeVoice deferred to v0.2) with MappingProxyType wrap, fail-fast regex + revision validation at module import, MILESTONE constant + docstring lock — Phase 1
+- ✓ `settings.py` extended additively with HF_HOME_DEFAULT + _HFModelRevisionsView (derives from registry, no duplication) + get_provider_capability facade — Phase 1
+- ✓ Conftest sys.path hack removed (00-02 audit D3 closes); regression net expanded 101 → 145 tests (44 new in `test_providers.py` and `TestPhase1Additions`) — Phase 1
 
 ### Active (In Progress)
-- [ ] Phase 1 — Architecture and Configuration (next up)
+- [ ] Phase 2 — TTS Engine Modernization (next up)
 
 ### Planned (Next)
 - Phase 1: settings/config module + provider abstraction + key precedence
@@ -155,4 +158,4 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-05-21 after Phase 0*
+*Last updated: 2026-05-21 after Phase 1*
