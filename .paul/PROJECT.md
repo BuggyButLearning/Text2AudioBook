@@ -14,7 +14,7 @@ A non-technical user can drop a text file into a desktop app and get back a high
 |-----------|-------|
 | Type | Application |
 | Version | 0.0.0 |
-| Status | Phases 0 + 1 complete; Phase 2 (TTS Engine Modernization) next |
+| Status | Phases 0 + 1 + 2 complete; Phase 2.1 (Model Discovery and Selection) next |
 | Last Updated | 2026-05-21 |
 
 ## Requirements
@@ -34,9 +34,12 @@ A non-technical user can drop a text file into a desktop app and get back a high
 - ✓ `providers.py` immutable single-source-of-truth registry (3 providers: OpenAI / Ollama / Kokoro; VibeVoice deferred to v0.2) with MappingProxyType wrap, fail-fast regex + revision validation at module import, MILESTONE constant + docstring lock — Phase 1
 - ✓ `settings.py` extended additively with HF_HOME_DEFAULT + _HFModelRevisionsView (derives from registry, no duplication) + get_provider_capability facade — Phase 1
 - ✓ Conftest sys.path hack removed (00-02 audit D3 closes); regression net expanded 101 → 145 tests (44 new in `test_providers.py` and `TestPhase1Additions`) — Phase 1
+- ✓ `tts_conversion.py` rewired to consume `providers.PROVIDER_REGISTRY` (module-level compiled regex constants; no inline capability duplication); `settings.OPENAI_FALLBACK_MODELS` ↔ registry consistency invariant locked by test — Phase 2
+- ✓ OpenAI SDK migrated to non-deprecated `client.audio.speech.with_streaming_response.create(...)` context manager; zero DeprecationWarning in regression run; explicit `catch_warnings` test proves contract — Phase 2
+- ✓ Per-provider concurrency clamp with three-branch policy-explicit logging (clamped / under-cap-local / hosted); structured chunk-level logging (provider/model/voice/attempt/elapsed) with api_key + full-chunk-text redaction; `_safe_status_callback` isolates UI failures from synthesis retry budget; regression net expanded 145 → 161 tests (+16 across `TestConcurrencyClamp`, `TestWithStreamingResponse`, `TestChunkLogging`, `TestStatusCallbackIsolation`, fallback-consistency + non-string-input tests) — Phase 2
 
 ### Active (In Progress)
-- [ ] Phase 2 — TTS Engine Modernization (next up)
+- [ ] Phase 2.1 — Model Discovery and Selection (next up)
 
 ### Planned (Next)
 - Phase 1: settings/config module + provider abstraction + key precedence
@@ -118,17 +121,21 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | §14.2(4) HF cache: default `~/.cache/huggingface`; `HF_HOME` env override exposed | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
 | §14.2(5) Multi-speaker scripting deferred to v0.2 | Tied to Phase 6.3 deferral (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
 | §14.2(6) Default provider: OpenAI hosted; Kokoro offline | Confirmed during 00-01 approval (see .paul/phases/00-discovery-and-approval/00-01-APPROVAL-PACKET.md) | 2026-05-21 | Active |
+| Phase 2: tts_conversion.py consumes the immutable providers.PROVIDER_REGISTRY as single source of truth; settings.OPENAI_FALLBACK_MODELS retained as parallel facade with drift-lock test | Avoids the Phase 1 G1/M2 defect class (HF revision drift) for OpenAI fallback models | 2026-05-21 | Active |
+| Phase 2: OpenAI SDK uses `with_streaming_response.create(...)` context manager; non-streaming `create()` actively asserted against in tests | Eliminates DeprecationWarning + future-proofs against openai 3.x removal of `response.stream_to_file()` direct call | 2026-05-21 | Active |
+| Phase 2: Local-provider concurrency clamped at registry default; hosted honors user-requested value; clamp event always logged with explicit policy message | Local synthesis is memory-bound; hosted is rate-limit-bound — split policy correctly. Auditor sees clamp decisions at a glance | 2026-05-21 | Active |
+| Phase 2: status_callback failures isolated via `_safe_status_callback` (logged WARNING, never abort chunk synthesis) | Realistic trigger is Tkinter "main thread not in main loop" after GUI close; UI bugs must not consume retry budget | 2026-05-21 | Active |
 
 ## Success Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| OpenAI SDK migration | TTS path runs via official SDK, no raw `requests.post` to `/v1/audio/speech` | Not started | Not started |
+| OpenAI SDK migration | TTS path runs via official SDK, no raw `requests.post` to `/v1/audio/speech` | Live (with_streaming_response context manager; 0 DeprecationWarning) | ✓ Phase 2 |
 | Provider parity | OpenAI + Kokoro paths both produce playable MP3 from same text input | Not started | Not started |
 | Test coverage on deterministic logic | Unit tests cover chunking, config precedence, provider dispatch, retry decision logic | None | Not started |
 | Real OpenAI smoke test | <$1 cost, <5 min runtime, produces valid MP3 | Not run | Not started |
 | VibeVoice safety artifacts preserved | Audible disclaimer + watermark present in 100% of sampled outputs | Not run | Not started |
-| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 0 / 10 | Not started |
+| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 3 / 10 | In progress |
 
 ## Tech Stack / Tools
 
@@ -158,4 +165,4 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-05-21 after Phase 1*
+*Last updated: 2026-05-21 after Phase 2*

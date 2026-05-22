@@ -1,15 +1,23 @@
 import logging
+import re
 import time
+import warnings  # noqa: F401  (kept for parity with deprecation-warning test scaffolding)
 import requests
 from pydub import AudioSegment
 from concurrent.futures import ThreadPoolExecutor
 
+import providers
 from settings import OPENAI_FALLBACK_MODELS
 
 
+_OPENAI_MODEL_RE = re.compile(providers.PROVIDER_REGISTRY["OpenAI"].model_pattern)
+_OLLAMA_MODEL_RE = re.compile(providers.PROVIDER_REGISTRY["Ollama"].model_pattern, re.IGNORECASE)
+
+
 def _filter_openai_tts_models(model_ids):
-    valid = [model_id for model_id in model_ids if "tts" in model_id.lower()]
-    return sorted(set(valid)) or OPENAI_FALLBACK_MODELS.copy()
+    cap = providers.PROVIDER_REGISTRY["OpenAI"]
+    valid = sorted({mid for mid in model_ids if _OPENAI_MODEL_RE.match(mid)})
+    return valid or list(cap.fallback_models)
 
 
 def list_openai_models(api_key=None):
@@ -51,28 +59,47 @@ def _write_openai_speech(chunk, file_path, api_key, model, voice, speed=1.0, res
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key) if api_key else OpenAI()
-    response = client.audio.speech.create(
+    with client.audio.speech.with_streaming_response.create(
         model=model,
         voice=voice,
         input=chunk,
         speed=speed,
         response_format=response_format,
-    )
-    response.stream_to_file(file_path)
+    ) as response:
+        response.stream_to_file(file_path)
 
 
 def _validate_ollama_model_support(model_name):
-    lowered = (model_name or "").lower()
-    return any(token in lowered for token in ["bark", "kokoro", "tts", "speech"])
+    if not isinstance(model_name, str) or not model_name:
+        return False
+    return _OLLAMA_MODEL_RE.search(model_name) is not None
+
+
+def _safe_status_callback(callback, message):
+    if callback is None:
+        return
+    try:
+        callback(message)
+    except Exception as exc:
+        logging.warning("status_callback raised: %s", exc)
 
 
 def convert_text_chunk_to_speech(chunk, index, settings, output_folder, timestamp, status_callback=None, retries=3):
     file_path = output_folder / f"chunk_part_{index + 1}_{timestamp}.{settings.response_format}"
+    preview = (chunk[:80] + "...") if len(chunk) > 80 else chunk
+    preview = preview.replace("\n", " ")
 
     for attempt in range(1, retries + 1):
+        started = time.monotonic()
         try:
-            if status_callback:
-                status_callback(f"Converting chunk {index + 1} (attempt {attempt}/{retries})")
+            _safe_status_callback(
+                status_callback,
+                f"Converting chunk {index + 1} (attempt {attempt}/{retries})",
+            )
+            logging.info(
+                "chunk %d attempt %d/%d provider=%s model=%s voice=%s preview=%r",
+                index + 1, attempt, retries, settings.provider, settings.model, settings.voice, preview,
+            )
 
             if settings.provider == "Ollama":
                 if not _validate_ollama_model_support(settings.model):
@@ -94,18 +121,39 @@ def convert_text_chunk_to_speech(chunk, index, settings, output_folder, timestam
                 speed=settings.speed,
                 response_format=settings.response_format,
             )
-            logging.info("Chunk %s converted to speech and saved to %s.", index + 1, file_path)
+            elapsed = time.monotonic() - started
+            logging.info("chunk %d converted in %.2fs -> %s", index + 1, elapsed, file_path)
             return file_path
         except Exception as exc:
-            logging.error("Failed to convert chunk %s on attempt %s: %s", index + 1, attempt, exc)
+            logging.error("chunk %d attempt %d failed: %s", index + 1, attempt, exc)
             if attempt == retries:
+                logging.error("chunk %d exhausted retries; returning None", index + 1)
                 return None
             time.sleep(min(2 ** (attempt - 1), 4))
 
 
 def convert_text_to_speech(text_chunks, settings, output_folder, timestamp, status_callback=None):
     audio_files = []
-    max_workers = max(1, settings.max_concurrency)
+    requested = max(1, settings.max_concurrency)
+    cap = providers.get_provider_capability(settings.provider)
+    if cap and cap.kind in ("local-api", "local-hf") and requested > cap.default_max_concurrency:
+        max_workers = cap.default_max_concurrency
+        logging.info(
+            "clamped requested=%d to registry-default=%d for local provider %s (chunks=%d)",
+            requested, max_workers, settings.provider, len(text_chunks),
+        )
+    elif cap and cap.kind in ("local-api", "local-hf"):
+        max_workers = requested
+        logging.info(
+            "using requested concurrency=%d for local provider %s (under cap %d, chunks=%d)",
+            max_workers, settings.provider, cap.default_max_concurrency, len(text_chunks),
+        )
+    else:
+        max_workers = requested
+        logging.info(
+            "using requested concurrency=%d for provider %s (chunks=%d)",
+            max_workers, settings.provider, len(text_chunks),
+        )
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(convert_text_chunk_to_speech, chunk, i, settings, output_folder, timestamp, status_callback)

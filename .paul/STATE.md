@@ -5,28 +5,28 @@
 See: .paul/PROJECT.md (updated 2026-05-21)
 
 **Core value:** Convert text files into high-quality audiobook MP3s with a choice of hosted (OpenAI) or local (Ollama / Kokoro) TTS providers, without editing code. (VibeVoice deferred to v0.2.)
-**Current focus:** v0.1 Modernization MVP — Phase 2 (TTS Engine Modernization)
+**Current focus:** v0.1 Modernization MVP — Phase 2.1 (Model Discovery and Selection)
 
 ## Current Position
 
 Milestone: v0.1 Modernization MVP (v0.1.0)
-Phase: 2 of 11 (TTS Engine Modernization) — Not started
+Phase: 2.1 of 11 (Model Discovery and Selection) — Ready to plan
 Plan: Not started
-Status: Phase 1 complete; ready to plan Phase 2
-Last activity: 2026-05-21 — Phase 1 transition: providers.py contract layer + settings additions shipped to PROJECT.md "Validated"; ROADMAP Phase 1 marked Complete; paul.json advanced to phase 2
+Status: Ready to plan
+Last activity: 2026-05-21 — Phase 2 transition complete: PROJECT.md "Validated" + key-decisions promoted; ROADMAP Phase 2 marked Complete; paul.json advanced to phase 2.1; phase commit pending stage+commit.
 
 Progress:
-- Milestone: [██░░░░░░░░] 20% (2 of 10 active v0.1 phases done; Phase 6.3 deferred to v0.2)
-- Phase 2: [░░░░░░░░░░] 0%
+- Milestone: [███░░░░░░░] 30% (3 of 10 active v0.1 phases done; Phase 6.3 deferred to v0.2)
+- Phase 2.1: [░░░░░░░░░░] 0% (planning to start)
 
 ## Loop Position
 
-Current loop state (next: Phase 2):
+Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Ready for Phase 2 PLAN]
+  ○        ○        ○     [Idle — ready for Phase 2.1 PLAN]
 ```
-Phase 0: ✅ Complete · Phase 1: ✅ Complete (01-01 PLAN ✓ APPLY ✓ UNIFY ✓).
+Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete.
 
 ## Accumulated Context
 
@@ -52,6 +52,9 @@ Phase 0: ✅ Complete · Phase 1: ✅ Complete (01-01 PLAN ✓ APPLY ✓ UNIFY �
 | 01-01 applied 2026-05-21: providers.py contract layer live; settings.py extended additively; conftest sys.path hack removed (00-02 D3 closes); 145 tests passing in 0.77s | Phase 1 | Single-source-of-truth registry now available for Phase 2 wiring; v0.1 milestone guardrails in code (MILESTONE constant, immutable registry, ast no-new-deps check) |
 | Phase 1 transition complete 2026-05-21: PROJECT.md gained 3 "Validated (Shipped)" entries; ROADMAP Phase 1 marked Complete; paul.json advanced to phase 2; git commit `5cead5c` created locally (not pushed) | Phase 1 → Phase 2 | Milestone progress: 2/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
 | Pre-PAUL modernization edits committed 2026-05-21 as `f2ff098`: tts_conversion SDK migration + Ollama discovery + retries; text_processing paragraph/sentence-aware chunking; main.py ttkbootstrap GUI + provider/quality/voice dropdowns; combine_and_convert ffmpeg GPU-aware; requirements pinned | Phase 1 → Phase 2 | Phase 2 (and partially 3/4/5) baseline now in HEAD. Phase 2 plan can focus on integrating providers.py registry into the already-migrated SDK code rather than from-scratch refactor. Regression net still 145/145 green after the commit. |
+| 02-01 audited 2026-05-21: verdict conditionally acceptable; 1 must-have + 6 strongly-recommended upgrades applied; 3 deferred | Phase 2 | M1 settings/registry fallback consistency test; S1 module-level compiled regex; S2 status_callback exception isolation; S3 fake stream writes bytes; S4 non-string input guard; S5 explicit DeprecationWarning catch_warnings; S6 explicit clamp-event log message. AUDIT.md at `.paul/phases/02-tts-engine-modernization/02-01-AUDIT.md` |
+| 02-01 applied 2026-05-21: tts_conversion.py now consumes providers.PROVIDER_REGISTRY (module-level compiled regex), `_write_openai_speech` uses with_streaming_response context manager, concurrency clamp + structured logging + `_safe_status_callback` isolation live; 161 tests pass in 0.64s; zero DeprecationWarning; providers.py untouched | Phase 2 | Registry-driven implementation gap closed; Phase 2.1 can build on `list_openai_models`/`list_ollama_models` for Refresh Models UI flow. SUMMARY.md + pytest log at `.paul/phases/02-tts-engine-modernization/`. |
+| 02-01 unified 2026-05-21: SUMMARY.md augmented with full frontmatter (requires/provides/affects/key-decisions/patterns); performance, deviations (0 auto-fix / 0 scope-add / 3 audit-deferred), task commits (deferred to phase commit at transition), issues (none) sections added; loop closed | Phase 2 | Single plan in Phase 2 → transition workflow required next (PROJECT.md promote, ROADMAP Phase 2 Complete, paul.json → 2.1, phase git commit) |
 
 ### Git State
 Last commit: `f2ff098` — chore(pre-paul): land in-progress modernization edits as Phase 2-5 baseline
@@ -83,8 +86,8 @@ Working tree: clean except IDE noise (.vscode/, test_tracking/.vscode.configs.im
 ## Session Continuity
 
 Last session: 2026-05-21
-Stopped at: Pre-PAUL modernization edits committed as `f2ff098`. Working tree clean. Phase 2 unblocked.
-Next action: `/paul:plan` for Phase 2 (TTS Engine Modernization), scoped to integrate providers.py registry into the already-SDK-migrated tts_conversion.py.
+Stopped at: Phase 2 complete; transitioned to Phase 2.1 (Model Discovery and Selection). Phase 2 git commit pending.
+Next action: `/paul:plan` for Phase 2.1 (Model Discovery and Selection)
 Resume file: .paul/ROADMAP.md
 
 ---
