@@ -7,8 +7,8 @@
     "status": "in_progress"
   },
   "phase": {
-    "number": 3,
-    "name": "Text Processing Improvements",
+    "number": 4,
+    "name": "GUI Reliability and UX",
     "status": "ready_to_plan"
   },
   "loop": {

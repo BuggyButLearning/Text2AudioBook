@@ -7,8 +7,8 @@ Migrate the existing Tkinter-based text-to-audio utility from a raw-HTTP OpenAI 
 ## Current Milestone
 
 **v0.1 Modernization MVP** (v0.1.0)
-Status: In progress (Phases 0 + 1 + 2 + 2.1 complete; Phase 3 next)
-Phases: 4 of 11 complete (4 of 10 active v0.1 phases — Phase 6.3 deferred to v0.2)
+Status: In progress (Phases 0 + 1 + 2 + 2.1 + 3 complete; Phase 4 next)
+Phases: 5 of 11 complete (5 of 10 active v0.1 phases — Phase 6.3 deferred to v0.2)
 
 ## Phases
 
@@ -24,8 +24,8 @@ Phases execute in numeric order.
 | 1 | Architecture and Configuration | 1 | Complete | 2026-05-21 |
 | 2 | TTS Engine Modernization | 1 | Complete | 2026-05-21 |
 | 2.1 | Model Discovery and Selection | 1 | Complete | 2026-05-21 |
-| 3 | Text Processing Improvements | TBD | Planning | - |
-| 4 | GUI Reliability and UX | TBD | Not started | - |
+| 3 | Text Processing Improvements | 1 | Complete | 2026-05-21 |
+| 4 | GUI Reliability and UX | TBD | Planning | - |
 | 5 | Audio/Video Cleanup | TBD | Not started | - |
 | 6 | Local Provider — Ollama | TBD | Not started | - |
 | 6.2 | Local Provider — Kokoro-82M | TBD | Not started | - |
@@ -112,4 +112,4 @@ Phases execute in numeric order.
 
 ---
 *Roadmap created: 2026-05-21*
-*Last updated: 2026-05-21 (Phase 2.1 complete)*
+*Last updated: 2026-05-21 (Phase 3 complete)*

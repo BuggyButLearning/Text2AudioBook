@@ -5,26 +5,26 @@
 See: .paul/PROJECT.md (updated 2026-05-21)
 
 **Core value:** Convert text files into high-quality audiobook MP3s with a choice of hosted (OpenAI) or local (Ollama / Kokoro) TTS providers, without editing code. (VibeVoice deferred to v0.2.)
-**Current focus:** v0.1 Modernization MVP — Phase 3 (Text Processing Improvements)
+**Current focus:** v0.1 Modernization MVP — Phase 4 (GUI Reliability and UX)
 
 ## Current Position
 
 Milestone: v0.1 Modernization MVP (v0.1.0)
-Phase: 3 of 11 (Text Processing Improvements) — Ready to plan
+Phase: 4 of 11 (GUI Reliability and UX) — Ready to plan
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-05-21 — Phase 2.1 transition complete: PROJECT.md "Validated" + 5 Phase 2.1 key decisions promoted; ROADMAP Phase 2.1 marked Complete; paul.json advanced to phase 3; phase commit pending stage+commit.
+Last activity: 2026-05-21 — Phase 3 transition complete: PROJECT.md "Validated" + 2 Phase 3 key decisions promoted; ROADMAP Phase 3 marked Complete; paul.json advanced to phase 4; phase commit pending stage+commit.
 
 Progress:
-- Milestone: [████░░░░░░] 40% (4 of 10 active v0.1 phases done; Phase 6.3 deferred to v0.2)
-- Phase 3: [░░░░░░░░░░] 0% (planning to start)
+- Milestone: [█████░░░░░] 50% (5 of 10 active v0.1 phases done; Phase 6.3 deferred to v0.2)
+- Phase 4: [░░░░░░░░░░] 0% (planning to start)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Idle — ready for Phase 3 PLAN]
+  ○        ○        ○     [Idle — ready for Phase 4 PLAN]
 ```
 Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete · Phase 2.1: ✅ Complete.
 
@@ -58,9 +58,13 @@ Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete · Phase
 | Phase 2 transition complete 2026-05-21: PROJECT.md gained 4 "Validated (Shipped)" entries + 4 Phase 2 Key Decisions; ROADMAP Phase 2 marked Complete; Phase 2.1 promoted to Planning; paul.json advanced to phase 2.1; git commit `92a902e` created locally (not pushed) | Phase 2 → Phase 2.1 | Milestone progress: 3/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
 | 02.1-01 audited 2026-05-21: verdict conditionally acceptable; 1 must-have + 5 strongly-recommended upgrades applied; 3 deferred | Phase 2.1 | M1 `_scrub_api_key` helper + credential-not-in-logs test; S1 Source.EMPTY for OpenAI live-but-allowlist-empty (parity with Ollama); S2 canonical Ollama URL in cache key (None ≡ default ≡ trailing-slash); S3 None-vs-default api_key cache-sharing test; S4 explicit FALLBACK-cached-until-invalidate test; S5 `error` field contract: short user-readable string, credential-scrubbed. AUDIT.md at `.paul/phases/02.1-model-discovery-and-selection/02.1-01-AUDIT.md` |
 | 02.1-01 applied 2026-05-21: model_discovery.py module created with DiscoveryResult+Source+_scrub_api_key+_canonical_ollama_url+discover_models+invalidate_cache; tts_conversion.py reduced to thin shims; Ollama curated allowlist filter live (PRD §14.1(a)); 179 tests pass in 0.67s; zero DeprecationWarning; main.py untouched; providers.py untouched; 1 DRIFT auto-fixed via characterization | Phase 2.1 | Discovery now decoupled from synthesis; Phase 4's Refresh Models button has clean hook (invalidate_cache + discover_models). SUMMARY.md + pytest log at `.paul/phases/02.1-model-discovery-and-selection/`. |
+| Phase 2.1 transition complete 2026-05-21: PROJECT.md gained 3 "Validated (Shipped)" entries + 5 Phase 2.1 Key Decisions; ROADMAP Phase 2.1 marked Complete; Phase 3 promoted to Planning; paul.json advanced to phase 3; git commit `74bfd8d` created locally (not pushed) | Phase 2.1 → Phase 3 | Milestone progress: 4/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
+| 03-01 audited 2026-05-21: verdict conditionally acceptable; 0 must-have + 4 strongly-recommended upgrades applied; 3 deferred | Phase 3 | S1 corrected off-by-8 baseline test count (20 existing, not 12); S2 `_locate` DEBUG-log on fallback path (defensive observability); S3 `test_distinct_chunks_have_distinct_positions` (traps [0,0,0] regression); S4 reconstruction-test hardening (non-empty chunks + source-slice length floor). AUDIT.md at `.paul/phases/03-text-processing-improvements/03-01-AUDIT.md` |
+| 03-01 applied 2026-05-21: text_processing.py refactored to forward-cursor `_locate` (position-accuracy fix for duplicate substrings); OPENAI_TTS_MAX_INPUT_CHARS=4096 + DEFAULT_CHUNK_MAX=3500 constants exported; reconstruction-invariant test pattern + 16 new tests across TestSplitTextBudget/Positions/EdgeCases; 195 tests pass in 0.76s; first-pass green | Phase 3 | Phase 4 GUI progress bar can trust positions[] (no duplicate-substring confusion). SUMMARY.md + pytest log at `.paul/phases/03-text-processing-improvements/`. |
 
 ### Git State
-Last commit: `92a902e` — feat(02-tts-engine-modernization): close Phase 2 with registry-driven TTS + non-deprecated streaming SDK
+Last commit: `74bfd8d` — feat(02.1-model-discovery-and-selection): close Phase 2.1 with extracted discovery + cache + Ollama allowlist
+Phase 2.1 commit: `74bfd8d` — feat(02.1-model-discovery-and-selection): close Phase 2.1 with extracted discovery + cache + Ollama allowlist
 Phase 2 commit: `92a902e` — feat(02-tts-engine-modernization): close Phase 2 with registry-driven TTS + non-deprecated streaming SDK
 Pre-PAUL baseline: `f2ff098` — chore(pre-paul): land in-progress modernization edits as Phase 2-5 baseline
 Phase 1 commit: `5cead5c` — feat(01-architecture-and-configuration): close Phase 1 with provider abstraction contracts
@@ -91,8 +95,8 @@ Working tree: clean except IDE noise (.vscode/, test_tracking/.vscode.configs.im
 ## Session Continuity
 
 Last session: 2026-05-21
-Stopped at: Phase 2.1 complete; transitioned to Phase 3 (Text Processing Improvements). Phase 2.1 git commit pending.
-Next action: `/paul:plan` for Phase 3 (Text Processing Improvements)
+Stopped at: Phase 3 complete; transitioned to Phase 4 (GUI Reliability and UX). Phase 3 git commit pending.
+Next action: `/paul:plan` for Phase 4 (GUI Reliability and UX)
 Resume file: .paul/ROADMAP.md
 
 ---

@@ -14,7 +14,7 @@ A non-technical user can drop a text file into a desktop app and get back a high
 |-----------|-------|
 | Type | Application |
 | Version | 0.0.0 |
-| Status | Phases 0 + 1 + 2 + 2.1 complete; Phase 3 (Text Processing Improvements) next |
+| Status | Phases 0 + 1 + 2 + 2.1 + 3 complete; Phase 4 (GUI Reliability and UX) next |
 | Last Updated | 2026-05-21 |
 
 ## Requirements
@@ -40,9 +40,10 @@ A non-technical user can drop a text file into a desktop app and get back a high
 - ✓ `model_discovery.py` module: frozen `DiscoveryResult` + `Source` enum (LIVE/FALLBACK/EMPTY); `discover_models` with `use_cache` + per-(provider, canonical-identity) cache; explicit `invalidate_cache(provider=None)` entry point for Phase 4's "Refresh Models" button; `_scrub_api_key` redacts credentials from discovery error logs + DiscoveryResult.error — Phase 2.1
 - ✓ Ollama curated allowlist filter live (PRD §14.1(a)): registry pattern hides non-TTS models (llama3, mistral) from the discovery dropdown; canonical URL normalization in cache key (None ≡ default ≡ trailing-slash) — Phase 2.1
 - ✓ Back-compat shims in `tts_conversion.py` preserve `list_openai_models` / `list_ollama_models` / `list_available_models` imports for main.py; regression net expanded 161 → 179 tests (+18 in new `test_model_discovery.py`); main.py untouched — Phase 2.1
+- ✓ `text_processing.split_text` hardened with forward-only `find_cursor` (`_locate` helper): duplicate substrings now resolve to distinct source-ordered positions; reconstruction invariant locked by test; OPENAI_TTS_MAX_INPUT_CHARS=4096 + DEFAULT_CHUNK_MAX=3500 module-level constants; unicode + edge-case coverage; regression net expanded 179 → 195 tests (+16 across `TestSplitTextBudget`, `TestSplitTextPositions`, `TestSplitTextEdgeCases`); position-accuracy fix is bug fix not behavior shift (no characterization needed) — Phase 3
 
 ### Active (In Progress)
-- [ ] Phase 3 — Text Processing Improvements (next up)
+- [ ] Phase 4 — GUI Reliability and UX (next up)
 
 ### Planned (Next)
 - Phase 1: settings/config module + provider abstraction + key precedence
@@ -133,6 +134,8 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Phase 2.1: `Source.EMPTY` distinguishes "upstream responded but yielded nothing useful" from `Source.FALLBACK` (exception path) | Phase 4 GUI can route messaging correctly (red "down" banner vs yellow "no models" banner) | 2026-05-21 | Active |
 | Phase 2.1: Ollama discovery canonicalizes URL once; None ≡ default ≡ trailing-slash all collapse to one cache entry | Prevents drift between cache key and underlying network call | 2026-05-21 | Active |
 | Phase 2.1: `_scrub_api_key` redacts credentials from discovery error logs + DiscoveryResult.error | Discovery introduces new logging surface; Phase 2 set the synthesis-side invariant — Phase 2.1 propagates it to discovery | 2026-05-21 | Active |
+| Phase 3: `text_processing.split_text` uses forward-only `find_cursor` so duplicate substrings resolve to distinct, source-ordered positions | Prevents `text.find` from collapsing repeated phrases (e.g. "He said." appearing twice) onto a single offset; Phase 4 progress bar can rely on positions | 2026-05-21 | Active |
+| Phase 3: `OPENAI_TTS_MAX_INPUT_CHARS=4096` + `DEFAULT_CHUNK_MAX=3500` exposed as module-level constants in text_processing.py | Names the OpenAI hard ceiling and safe margin so future contributors cannot quietly raise the default past the API limit; per-provider char limits deferred to Phase 6 / 6.2 | 2026-05-21 | Active |
 
 ## Success Metrics
 
@@ -143,7 +146,7 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Test coverage on deterministic logic | Unit tests cover chunking, config precedence, provider dispatch, retry decision logic | None | Not started |
 | Real OpenAI smoke test | <$1 cost, <5 min runtime, produces valid MP3 | Not run | Not started |
 | VibeVoice safety artifacts preserved | Audible disclaimer + watermark present in 100% of sampled outputs | Not run | Not started |
-| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 4 / 10 | In progress |
+| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 5 / 10 | In progress |
 
 ## Tech Stack / Tools
 
@@ -173,4 +176,4 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-05-21 after Phase 2.1*
+*Last updated: 2026-05-21 after Phase 3*

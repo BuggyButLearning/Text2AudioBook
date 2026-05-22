@@ -1,4 +1,6 @@
 from text_processing import (
+    DEFAULT_CHUNK_MAX,
+    OPENAI_TTS_MAX_INPUT_CHARS,
     _chunk_preview,
     _normalize_text,
     _sentence_split,
@@ -103,3 +105,130 @@ class TestSplitText:
         chunks, _, _ = split_text(text, max_length=20)
         joined = " ".join(chunks)
         assert joined.index("Alpha") < joined.index("Beta") < joined.index("Gamma")
+
+
+class TestSplitTextBudget:
+    def test_default_chunk_max_under_openai_limit(self):
+        assert DEFAULT_CHUNK_MAX < OPENAI_TTS_MAX_INPUT_CHARS, (
+            f"DEFAULT_CHUNK_MAX={DEFAULT_CHUNK_MAX} must be < "
+            f"OPENAI_TTS_MAX_INPUT_CHARS={OPENAI_TTS_MAX_INPUT_CHARS}"
+        )
+
+    def test_openai_limit_value_matches_docs(self):
+        assert OPENAI_TTS_MAX_INPUT_CHARS == 4096
+
+    def test_default_max_length_is_default_chunk_max(self):
+        import inspect
+        sig = inspect.signature(split_text)
+        assert sig.parameters["max_length"].default == DEFAULT_CHUNK_MAX
+
+    def test_no_chunk_exceeds_openai_limit_on_long_input(self):
+        text = ("This is a sentence. " * 800).strip()
+        chunks, _, _ = split_text(text)
+        assert all(len(c) <= OPENAI_TTS_MAX_INPUT_CHARS for c in chunks)
+        assert all(len(c) <= DEFAULT_CHUNK_MAX for c in chunks)
+
+
+class TestSplitTextPositions:
+    def _reconstruct_check(self, text, chunks, positions):
+        """For each chunk, the text starting at positions[i] must begin with the
+        chunk's content (whitespace-tolerant first-20-char prefix check).
+        Audit S4: assert non-empty chunks and a source-slice length floor so a
+        past-EOF position fails fast."""
+        for chunk, pos in zip(chunks, positions):
+            assert len(chunk) > 0, f"empty chunk at position {pos}"
+            prefix = chunk.lstrip()[:40]
+            source_slice = text[pos:pos + len(prefix) + 10].lstrip()
+            assert len(source_slice) >= min(len(prefix), 10), (
+                f"source slice too short at position {pos} "
+                f"(text length={len(text)}, slice={source_slice!r})"
+            )
+            assert source_slice.startswith(prefix[:20]), (
+                f"Reconstruction failed: chunk prefix {prefix[:20]!r} "
+                f"not found at position {pos} (source slice: {source_slice[:30]!r})"
+            )
+
+    def test_positions_are_monotonic_non_decreasing(self):
+        text = "Alpha sentence.\n\nBeta sentence.\n\nGamma sentence."
+        chunks, positions, _ = split_text(text, max_length=20)
+        assert positions == sorted(positions), (
+            f"positions not monotonic: {positions}"
+        )
+
+    def test_distinct_chunks_have_distinct_positions(self):
+        """Audit S3: trap the [0, 0, 0] regression -- a broken implementation that
+        always returns 0 would pass the monotonic test."""
+        text = "Alpha sentence.\n\nBeta sentence.\n\nGamma sentence."
+        chunks, positions, _ = split_text(text, max_length=20)
+        assert len(chunks) >= 2, f"expected >= 2 chunks, got {len(chunks)}"
+        assert len(set(positions)) >= 2, (
+            f"all positions collapsed to the same value: {positions}"
+        )
+
+    def test_duplicate_paragraphs_get_distinct_positions(self):
+        # Regression for the position-accuracy bug: two identical paragraphs must
+        # resolve to two distinct, source-ordered offsets.
+        text = "He said.\n\nShe said.\n\nHe said."
+        chunks, positions, _ = split_text(text, max_length=10)
+        he_positions = [p for c, p in zip(chunks, positions) if "He said" in c]
+        assert len(he_positions) == 2, (
+            f"expected 2 'He said' chunks, got {len(he_positions)}: chunks={chunks}"
+        )
+        assert he_positions[0] != he_positions[1], (
+            f"duplicate 'He said' chunks collapsed to same position: {he_positions}"
+        )
+        assert he_positions[0] < he_positions[1]
+
+    def test_reconstruction_short_input(self):
+        text = "Hello world. This is short."
+        chunks, positions, _ = split_text(text)
+        self._reconstruct_check(text, chunks, positions)
+
+    def test_reconstruction_multi_paragraph(self):
+        text = "First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph here."
+        chunks, positions, _ = split_text(text, max_length=20)
+        self._reconstruct_check(text, chunks, positions)
+
+    def test_reconstruction_hard_split_sentence(self):
+        text = "a" * 500
+        chunks, positions, _ = split_text(text, max_length=100)
+        for chunk, pos in zip(chunks, positions):
+            assert text[pos:pos + len(chunk)] == chunk
+
+
+class TestSplitTextEdgeCases:
+    def test_unicode_content_survives(self):
+        text = "Café — François said \"hello\". Ɛach line has Üñïcode."
+        chunks, _, _ = split_text(text)
+        assert len(chunks) >= 1
+        assert "Café" in " ".join(chunks)
+        assert "François" in " ".join(chunks)
+
+    def test_multiple_blank_lines_between_paragraphs(self):
+        text = "Para one.\n\n\n\n\n\nPara two."
+        chunks, _, _ = split_text(text, max_length=3500)
+        assert len(chunks) == 1
+        assert "Para one" in chunks[0] and "Para two" in chunks[0]
+
+    def test_multiple_blank_lines_with_split(self):
+        text = "Para one.\n\n\n\n\n\nPara two."
+        chunks, _, _ = split_text(text, max_length=12)
+        assert len(chunks) == 2
+        assert all(c.strip() for c in chunks)
+
+    def test_exact_max_length_paragraph_stays_one_chunk(self):
+        para = "a" * 100
+        chunks, _, _ = split_text(para, max_length=100)
+        assert chunks == ["a" * 100]
+
+    def test_whitespace_only_returns_empty(self):
+        chunks, positions, sentences = split_text("   \n\n  \n\n")
+        assert chunks == []
+        assert positions == []
+        assert sentences == []
+
+    def test_long_no_punctuation_hard_splits_under_limit(self):
+        text = "a" * 5000
+        chunks, _, _ = split_text(text, max_length=4096)
+        assert len(chunks) >= 2
+        assert all(len(c) <= 4096 for c in chunks)
