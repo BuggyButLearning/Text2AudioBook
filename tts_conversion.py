@@ -86,9 +86,32 @@ def convert_text_chunk_to_speech(chunk, index, settings, output_folder, timestam
                         "Choose a local speech-capable model or switch provider to OpenAI."
                     )
                 raise RuntimeError(
-                    "Ollama model discovery is supported, but direct local speech synthesis is provider/model dependent and "
-                    "not available through standard Ollama endpoints in this build."
+                    "Ollama model discovery is supported, but direct local speech synthesis is "
+                    "provider/model dependent and not available through standard Ollama endpoints in "
+                    "this build. For local synthesis, use the Kokoro provider."
                 )
+
+            if settings.provider == "Kokoro":
+                # Phase 6.2: synthesize WAV via kokoro, convert to MP3 so the
+                # downstream concatenation stays MP3-uniform.
+                from kokoro_synthesis import _write_kokoro_speech, _convert_wav_to_mp3
+                wav_path = file_path.with_suffix(".wav")
+                mp3_path = file_path.with_suffix(".mp3")
+                _write_kokoro_speech(
+                    chunk=chunk,
+                    wav_path=wav_path,
+                    model=settings.model,
+                    voice=settings.voice,
+                    speed=settings.speed,
+                )
+                _convert_wav_to_mp3(wav_path, mp3_path)
+                try:
+                    wav_path.unlink()
+                except OSError:
+                    pass
+                elapsed = time.monotonic() - started
+                logging.info("kokoro chunk %d converted in %.2fs -> %s", index + 1, elapsed, mp3_path)
+                return mp3_path
 
             _write_openai_speech(
                 chunk=chunk,

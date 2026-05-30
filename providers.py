@@ -32,7 +32,10 @@ class ProviderCapability:
 
 
 _ALLOWED_REVISION_LITERALS = {"main", "master"}
-_SHA_RE = re.compile(r"[0-9a-f]{40,64}")
+# Git SHA is exactly 40 hex chars. Earlier regex allowed 40-64 which let a
+# 64-char SHA256-shaped value slip through and 404 against HF (revision not
+# found). Tightened to git SHA standard; semver + branch literals still accepted.
+_SHA_RE = re.compile(r"[0-9a-f]{40}")
 _SEMVER_RE = re.compile(r"v?\d+\.\d+\.\d+([+-][\w.]+)?")
 
 
@@ -89,7 +92,9 @@ _RAW_REGISTRY: dict[str, ProviderCapability] = {
         output_format="wav",
         default_max_concurrency=1,
         hf_model_repo="hexgrad/Kokoro-82M",
-        hf_model_revision="496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+        # Real main-branch SHA fetched 2026-05-22 from HF API; previous value was
+        # a 64-char fake that 404'd. Revalidate before each milestone bump.
+        hf_model_revision="f3ff3571791e39611d31c381e3a41a3af07b4987",
     ),
 }
 

@@ -7,8 +7,8 @@ Migrate the existing Tkinter-based text-to-audio utility from a raw-HTTP OpenAI 
 ## Current Milestone
 
 **v0.1 Modernization MVP** (v0.1.0)
-Status: In progress (Phases 0 + 1 + 2 + 2.1 + 3 complete; Phase 4 next)
-Phases: 5 of 11 complete (5 of 10 active v0.1 phases — Phase 6.3 deferred to v0.2)
+Status: **CODE COMPLETE** — all 10 active phases shipped (Phase 6.3 VibeVoice deferred to v0.2). Awaiting human-verify walkthrough (see HUMAN_VALIDATION_CHECKLIST.md) + git commit/tag.
+Phases: 10 of 11 complete (10 of 10 active v0.1 phases — Phase 6.3 deferred to v0.2)
 
 ## Phases
 
@@ -25,12 +25,12 @@ Phases execute in numeric order.
 | 2 | TTS Engine Modernization | 1 | Complete | 2026-05-21 |
 | 2.1 | Model Discovery and Selection | 1 | Complete | 2026-05-21 |
 | 3 | Text Processing Improvements | 1 | Complete | 2026-05-21 |
-| 4 | GUI Reliability and UX | TBD | Planning | - |
-| 5 | Audio/Video Cleanup | TBD | Not started | - |
-| 6 | Local Provider — Ollama | TBD | Not started | - |
-| 6.2 | Local Provider — Kokoro-82M | TBD | Not started | - |
+| 4 | GUI Reliability and UX | 1 | Complete | 2026-05-22 |
+| 5 | Audio/Video Cleanup | 1 | Complete | 2026-05-22 |
+| 6 | Local Provider — Ollama | 1 | Complete | 2026-05-22 |
+| 6.2 | Local Provider — Kokoro-82M | 1 | Complete | 2026-05-22 |
 | 6.3 | Local Provider — VibeVoice-1.5B | TBD | Deferred (v0.2) | - |
-| 7 | Testing, Validation, and Docs | TBD | Not started | - |
+| 7 | Testing, Validation, and Docs | 1 | Complete | 2026-05-22 |
 
 ## Phase Details
 
@@ -112,4 +112,4 @@ Phases execute in numeric order.
 
 ---
 *Roadmap created: 2026-05-21*
-*Last updated: 2026-05-21 (Phase 3 complete)*
+*Last updated: 2026-05-22 (all 10 active v0.1 phases complete; awaiting human walkthrough + tag)*

@@ -35,6 +35,7 @@ class RuntimeSettings:
     ollama_base_url: str = "http://localhost:11434"
     max_concurrency: int = 2
     response_format: str = "mp3"
+    chunk_max: int | None = None  # Phase 8: resolved via chunk_policy; None = use default
 
 
 def load_config() -> dict[str, Any]:
@@ -96,6 +97,7 @@ def build_runtime_settings(
     model: str | None = None,
     voice: str | None = None,
     output_folder: str | Path | None = None,
+    chunk_max: int | None = None,
 ) -> RuntimeSettings:
     config = load_config()
     preset_name = quality_preset or config.get("default_quality_preset") or "Balanced"
@@ -120,6 +122,16 @@ def build_runtime_settings(
         settings.voice = voice
     if quality_preset in QUALITY_PRESETS:
         settings.speed = QUALITY_PRESETS[quality_preset]["speed"]
+
+    # Phase 8: resolve chunk_max from explicit arg -> config[chunk_overrides] -> built-in policy.
+    if chunk_max is not None:
+        settings.chunk_max = int(chunk_max)
+    else:
+        from chunk_policy import resolve_chunk_max
+        settings.chunk_max = resolve_chunk_max(
+            settings.provider, model=settings.model,
+            overrides=config.get("chunk_overrides") or {},
+        )
     return settings
 
 

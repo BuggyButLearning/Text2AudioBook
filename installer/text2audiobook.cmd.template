@@ -1,0 +1,2 @@
+@echo off
+call conda run --no-capture-output -n text2audiobook python "{REPO_PATH}" %*

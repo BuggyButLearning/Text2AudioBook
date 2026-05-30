@@ -80,6 +80,35 @@ def _canonical_ollama_url(base_url: str | None) -> str:
     return (base_url or _OLLAMA_DEFAULT_URL).rstrip("/")
 
 
+def ollama_reachable(base_url: str | None = None, timeout: float = 2.0, request_fn=None) -> tuple[bool, str | None]:
+    """Pre-flight connectivity check distinct from model discovery.
+
+    Hits `{base_url}/api/version` (a cheap endpoint that any running Ollama
+    serves) and returns (True, None) on 2xx, (False, reason) otherwise.
+
+    `request_fn` is a test injection seam; defaults to `requests.get`.
+    Phase 6 separates "Ollama not running" (start `ollama serve`) from "Ollama
+    running but no TTS model installed" (pull a TTS-capable model) since the
+    user-facing fix differs.
+    """
+    canonical = _canonical_ollama_url(base_url)
+    getter = request_fn or requests.get
+    try:
+        response = getter(f"{canonical}/api/version", timeout=timeout)
+        status = getattr(response, "status_code", 0)
+        if 200 <= status < 300:
+            return (True, None)
+        return (False, f"Ollama responded HTTP {status}")
+    except requests.exceptions.ConnectTimeout:
+        return (False, "connection timed out -- Is `ollama serve` running?")
+    except requests.exceptions.ConnectionError as exc:
+        return (False, f"connection refused: {exc} -- Is `ollama serve` running?")
+    except requests.exceptions.Timeout:
+        return (False, "request timed out")
+    except Exception as exc:
+        return (False, f"reachability probe failed: {exc}")
+
+
 def _discover_openai(api_key: str | None) -> DiscoveryResult:
     cap = providers.PROVIDER_REGISTRY["OpenAI"]
     try:
@@ -118,6 +147,12 @@ def _discover_ollama(canonical_url: str) -> DiscoveryResult:
         if total > 0:
             return DiscoveryResult("Ollama", (), Source.EMPTY, "no models matched registry allowlist")
         return DiscoveryResult("Ollama", (), Source.EMPTY, None)
+    except requests.exceptions.ConnectionError as exc:
+        logging.warning("Ollama discovery failed (connection): %s", exc)
+        return DiscoveryResult(
+            "Ollama", (), Source.EMPTY,
+            f"connection refused ({exc}) -- Is `ollama serve` running?",
+        )
     except Exception as exc:
         logging.warning("Ollama discovery failed: %s", exc)
         return DiscoveryResult("Ollama", (), Source.EMPTY, str(exc))

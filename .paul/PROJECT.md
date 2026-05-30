@@ -14,8 +14,8 @@ A non-technical user can drop a text file into a desktop app and get back a high
 |-----------|-------|
 | Type | Application |
 | Version | 0.0.0 |
-| Status | Phases 0 + 1 + 2 + 2.1 + 3 complete; Phase 4 (GUI Reliability and UX) next |
-| Last Updated | 2026-05-21 |
+| Status | **v0.1 code complete** — all 10 active phases (0, 1, 2, 2.1, 3, 4, 5, 6, 6.2, 7) shipped; Phase 6.3 deferred to v0.2 per §14.2(1). Awaiting human walkthrough + tag. |
+| Last Updated | 2026-05-22 |
 
 ## Requirements
 
@@ -41,9 +41,16 @@ A non-technical user can drop a text file into a desktop app and get back a high
 - ✓ Ollama curated allowlist filter live (PRD §14.1(a)): registry pattern hides non-TTS models (llama3, mistral) from the discovery dropdown; canonical URL normalization in cache key (None ≡ default ≡ trailing-slash) — Phase 2.1
 - ✓ Back-compat shims in `tts_conversion.py` preserve `list_openai_models` / `list_ollama_models` / `list_available_models` imports for main.py; regression net expanded 161 → 179 tests (+18 in new `test_model_discovery.py`); main.py untouched — Phase 2.1
 - ✓ `text_processing.split_text` hardened with forward-only `find_cursor` (`_locate` helper): duplicate substrings now resolve to distinct source-ordered positions; reconstruction invariant locked by test; OPENAI_TTS_MAX_INPUT_CHARS=4096 + DEFAULT_CHUNK_MAX=3500 module-level constants; unicode + edge-case coverage; regression net expanded 179 → 195 tests (+16 across `TestSplitTextBudget`, `TestSplitTextPositions`, `TestSplitTextEdgeCases`); position-accuracy fix is bug fix not behavior shift (no characterization needed) — Phase 3
+- ✓ `main.py` background-threaded conversion via `threading.Thread(target=_run_conversion_worker, daemon=True)`; window stays responsive (draggable, status label ticks); `_thread_safe_status` chokepoint marshals worker→main thread via `root.after(0, ...)`; `_conversion_in_progress` flag (S1) blocks fast-double-click; `set_controls_enabled` locks all dropdowns + buttons mid-conversion — Phase 4
+- ✓ "Refresh Models" button truly refreshes: `invalidate_cache(provider)` called BEFORE `discover_models(..., use_cache=False)`; `DiscoveryResult.source` routed to status label (LIVE / EMPTY / FALLBACK / registry-list); enumerated validation errors ("Please provide: Input File, Output File Name, Model") — Phase 4
+- ✓ Registry-driven provider dropdown: `provider_options = list(list_providers())` replaces hardcoded list (drift bug eliminated — adding to PROVIDER_REGISTRY auto-surfaces in GUI); capability-driven `voice_menu` repopulates from `cap.voices` on provider change; Kokoro pre-thread guard rejects Start with "Phase 6.2 pending" until synthesis lands; regression net expanded 195 → 228 tests (+33 across 8 test classes in test_main_gui_logic.py); zero new third-party deps — Phase 4
+- ✓ `combine_and_convert.py` cleaned: extracted `_validate_video_inputs` + `_build_ffmpeg_create_video_command` + `is_gpu_encoding_available(ffmpeg_runner=None)` injection seam; enumerated validation errors; ffmpeg-missing tolerance; +15 tests (228 → 243) — Phase 5
+- ✓ Ollama hardening: `ollama_reachable(base_url, timeout, request_fn)` connectivity probe; refined "ollama serve" hint on ConnectionError; "use Kokoro provider" hint in unsupported-endpoint error; +8 tests (243 → 251); documented v0.1 limitation (Ollama discovery-only, no general TTS endpoint) — Phase 6
+- ✓ Kokoro-82M local synthesis path live: new `kokoro_synthesis.py` module (lazy import + espeak-ng probe + `_write_kokoro_speech` + WAV→MP3); `tts_conversion` dispatches `Kokoro → _write_kokoro_speech`; `main.start_conversion` uses `kokoro_ready()` probe for actionable install errors; deps added (kokoro, soundfile, huggingface_hub); pinned HF revision from registry; +15 tests (251 → 266) — Phase 6.2
+- ✓ Opt-in real-OpenAI smoke test (`tests/test_openai_smoke.py`, gated by `OPENAI_SMOKE_TEST=1`); README rewritten for v0.1 multi-provider with provider matrix, env vars, install steps, troubleshooting; HUMAN_VALIDATION_CHECKLIST.md release-day walkthrough; 266 + 1 opt-in tests pass in 0.96s — Phase 7
 
 ### Active (In Progress)
-- [ ] Phase 4 — GUI Reliability and UX (next up)
+- [ ] v0.1 release validation: human walkthrough per HUMAN_VALIDATION_CHECKLIST.md → git commit + tag `v0.1.0` (HITL on `git push`)
 
 ### Planned (Next)
 - Phase 1: settings/config module + provider abstraction + key precedence
@@ -136,6 +143,10 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Phase 2.1: `_scrub_api_key` redacts credentials from discovery error logs + DiscoveryResult.error | Discovery introduces new logging surface; Phase 2 set the synthesis-side invariant — Phase 2.1 propagates it to discovery | 2026-05-21 | Active |
 | Phase 3: `text_processing.split_text` uses forward-only `find_cursor` so duplicate substrings resolve to distinct, source-ordered positions | Prevents `text.find` from collapsing repeated phrases (e.g. "He said." appearing twice) onto a single offset; Phase 4 progress bar can rely on positions | 2026-05-21 | Active |
 | Phase 3: `OPENAI_TTS_MAX_INPUT_CHARS=4096` + `DEFAULT_CHUNK_MAX=3500` exposed as module-level constants in text_processing.py | Names the OpenAI hard ceiling and safe margin so future contributors cannot quietly raise the default past the API limit; per-provider char limits deferred to Phase 6 / 6.2 | 2026-05-21 | Active |
+| Phase 4: GUI uses `threading.Thread` for synthesis and marshals widget writes back via `root.after(0, ...)` (single chokepoint `_thread_safe_status`) | Tkinter is not thread-safe on Windows; direct cross-thread writes crash or corrupt; chokepoint is the only auditable point | 2026-05-22 | Active |
+| Phase 4: `_conversion_in_progress` flag (audit S1) blocks fast-double-click on Start | Tk's single-threaded event loop makes read-check-set atomic; no lock needed | 2026-05-22 | Active |
+| Phase 4: Provider dropdown driven by `providers.list_providers()` (registry-pulled), not hardcoded; Kokoro pre-thread guard rejects Start with "Phase 6.2 pending" messagebox until synthesis lands | Drift-proof — adding to PROVIDER_REGISTRY auto-surfaces in GUI without main.py edit; honest UX (registry shape is single source of truth) | 2026-05-22 | Active |
+| Phase 4: `_format_discovery_status` FALLBACK semantic split — no-error reads "registry list (N)", error reads "discovery failed (...)" | Kokoro (no live probe path) deserves clean wording; OpenAI failure deserves clear failure wording | 2026-05-22 | Active |
 
 ## Success Metrics
 
@@ -146,7 +157,7 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 | Test coverage on deterministic logic | Unit tests cover chunking, config precedence, provider dispatch, retry decision logic | None | Not started |
 | Real OpenAI smoke test | <$1 cost, <5 min runtime, produces valid MP3 | Not run | Not started |
 | VibeVoice safety artifacts preserved | Audible disclaimer + watermark present in 100% of sampled outputs | Not run | Not started |
-| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 5 / 10 | In progress |
+| Phase exit criteria satisfied | All PRD §9 phases marked complete with validation blocks | 10 / 10 | Code complete |
 
 ## Tech Stack / Tools
 
@@ -176,4 +187,4 @@ Existing Python codebase: `main.py` (Tkinter entry), `text_processing.py`, `tts_
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-05-21 after Phase 3*
+*Last updated: 2026-05-22 after all v0.1 phases (0, 1, 2, 2.1, 3, 4, 5, 6, 6.2, 7) code complete*

@@ -3,6 +3,8 @@ import types
 
 import combine_and_convert
 from combine_and_convert import (
+    _build_ffmpeg_create_video_command,
+    _validate_video_inputs,
     combine_audio_files,
     get_media_height,
     is_gpu_encoding_available,
@@ -86,3 +88,92 @@ class TestGetMediaHeight:
 
         monkeypatch.setattr(combine_and_convert.subprocess, "run", boom)
         assert get_media_height("x") is None
+
+
+class TestValidateVideoInputs:
+    """Phase 5: pure-Python validation, mirror of main.py's _validate_conversion_inputs."""
+
+    def test_all_populated_returns_ok(self):
+        ok, missing = _validate_video_inputs(["a.mp3"], "img.png", "/tmp", "out")
+        assert ok is True
+        assert missing == []
+
+    def test_empty_mp3_list_flags_field(self):
+        ok, missing = _validate_video_inputs([], "img.png", "/tmp", "out")
+        assert ok is False
+        assert missing == ["MP3 Files"]
+
+    def test_all_empty_returns_all_fields(self):
+        ok, missing = _validate_video_inputs([], "", "", "")
+        assert ok is False
+        assert missing == ["MP3 Files", "Background Image", "Output Folder", "Output File Name"]
+
+    def test_whitespace_image_counts_as_empty(self):
+        ok, missing = _validate_video_inputs(["a.mp3"], "   ", "/tmp", "out")
+        assert ok is False
+        assert "Background Image" in missing
+
+    def test_none_image_counts_as_empty(self):
+        ok, missing = _validate_video_inputs(["a.mp3"], None, "/tmp", "out")
+        assert ok is False
+        assert "Background Image" in missing
+
+    def test_field_order_stable(self):
+        ok, missing = _validate_video_inputs([], "", "/tmp", "out")
+        assert missing == ["MP3 Files", "Background Image"]
+
+
+class TestBuildFfmpegCommand:
+    """Phase 5: extracted command builder so encoder selection and flag order
+    are testable without invoking ffmpeg."""
+
+    def test_gpu_branch_uses_h264_nvenc(self):
+        argv = _build_ffmpeg_create_video_command("a.mp3", "img.png", "out.mp4", 24, use_gpu=True)
+        assert "h264_nvenc" in argv
+        assert "libx264" not in argv
+
+    def test_cpu_branch_uses_libx264(self):
+        argv = _build_ffmpeg_create_video_command("a.mp3", "img.png", "out.mp4", 24, use_gpu=False)
+        assert "libx264" in argv
+        assert "h264_nvenc" not in argv
+
+    def test_required_flags_present(self):
+        argv = _build_ffmpeg_create_video_command("a.mp3", "img.png", "out.mp4", 24, use_gpu=False)
+        for flag in ["-tune", "stillimage", "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", "-shortest", "-y", "-loop", "1"]:
+            assert flag in argv
+
+    def test_fps_interpolated_as_string(self):
+        argv = _build_ffmpeg_create_video_command("a.mp3", "img.png", "out.mp4", 30, use_gpu=False)
+        idx = argv.index("-r")
+        assert argv[idx + 1] == "30"
+
+    def test_paths_stringified(self):
+        from pathlib import Path
+        argv = _build_ffmpeg_create_video_command(Path("a.mp3"), Path("img.png"), Path("out.mp4"), 24, use_gpu=False)
+        assert "a.mp3" in argv
+        assert "img.png" in argv
+        assert "out.mp4" in argv
+
+    def test_ffmpeg_is_first(self):
+        argv = _build_ffmpeg_create_video_command("a.mp3", "img.png", "out.mp4", 24, use_gpu=True)
+        assert argv[0] == "ffmpeg"
+
+
+class TestGpuProbeInjectionSeam:
+    """Phase 5: is_gpu_encoding_available now accepts ffmpeg_runner injection
+    for tests, AND tolerates ffmpeg-missing-from-PATH (audit S2)."""
+
+    def test_returns_false_when_ffmpeg_missing(self):
+        def fake_runner(*_a, **_kw):
+            raise FileNotFoundError("ffmpeg not found")
+        assert is_gpu_encoding_available(ffmpeg_runner=fake_runner) is False
+
+    def test_returns_false_on_os_error(self):
+        def fake_runner(*_a, **_kw):
+            raise OSError("permission denied")
+        assert is_gpu_encoding_available(ffmpeg_runner=fake_runner) is False
+
+    def test_injection_seam_used_when_provided(self):
+        def fake_runner(*_a, **_kw):
+            return types.SimpleNamespace(stdout="h264_nvenc available", returncode=0)
+        assert is_gpu_encoding_available(ffmpeg_runner=fake_runner) is True

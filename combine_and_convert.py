@@ -11,8 +11,54 @@ from ttkbootstrap.constants import BOTH, DISABLED, SECONDARY, SUCCESS, W
 
 CONFIG_FILE = "config.json"
 
+SCRIPT_DIRECTORY = Path(__file__).parent
+default_output_folder = SCRIPT_DIRECTORY / "output"
+
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+_VIDEO_VALIDATION_LABELS = {
+    "mp3_files": "MP3 Files",
+    "image_file": "Background Image",
+    "output_folder": "Output Folder",
+    "output_filename": "Output File Name",
+}
+
+
+def _validate_video_inputs(mp3_files, image_file, output_folder, output_filename):
+    """Return (ok, missing) where missing is the list of friendly field labels
+    that are empty. Pure-Python -- no Tk dependency."""
+    fields = {
+        "mp3_files": list(mp3_files or []),
+        "image_file": (image_file or "").strip(),
+        "output_folder": (output_folder or "").strip(),
+        "output_filename": (output_filename or "").strip(),
+    }
+    missing = [_VIDEO_VALIDATION_LABELS[k] for k, v in fields.items() if not v]
+    return (len(missing) == 0, missing)
+
+
+def _build_ffmpeg_create_video_command(audio_file, image_file, output_file, fps, use_gpu):
+    """Pure-Python builder for the ffmpeg argv list. Extracted so tests can assert
+    encoder selection and flag order without invoking ffmpeg."""
+    encoder = "h264_nvenc" if use_gpu else "libx264"
+    return [
+        "ffmpeg",
+        "-y",
+        "-loop", "1",
+        "-i", str(image_file),
+        "-i", str(audio_file),
+        "-c:v", encoder,
+        "-tune", "stillimage",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        "-r", str(fps),
+        str(output_file),
+    ]
+
 
 # Function to combine multiple audio files into one
 def combine_audio_files(file_paths):
@@ -24,16 +70,23 @@ def combine_audio_files(file_paths):
     return combined
 
 # Function to check if GPU encoding is available
-def is_gpu_encoding_available():
+def is_gpu_encoding_available(ffmpeg_runner=None):
+    """Probe whether ffmpeg lists `h264_nvenc` among its encoders.
+
+    `ffmpeg_runner` is an injection seam for tests -- defaults to the real
+    `subprocess.run`. Returns False on any subprocess / FS error (ffmpeg
+    missing from PATH, non-zero exit, OS-level error).
+    """
+    runner = ffmpeg_runner or subprocess.run
     try:
-        result = subprocess.run(
+        result = runner(
             ["ffmpeg", "-encoders"], capture_output=True, text=True, check=True
         )
-        available = "h264_nvenc" in result.stdout
+        available = "h264_nvenc" in (result.stdout or "")
         if not available:
             logging.warning("h264_nvenc not found in ffmpeg encoders.")
         return available
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
         logging.error(f"Error checking GPU encoding: {e}")
         return False
 
@@ -89,30 +142,7 @@ def create_video(audio_file, image_file, output_file, fps=24, max_height=4096):
 
     try:
         subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-loop",
-                "1",
-                "-i",
-                str(image_file),
-                "-i",
-                str(audio_file),
-                "-c:v",
-                'h264_nvenc' if use_gpu else 'libx264',
-                "-tune",
-                "stillimage",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                "-pix_fmt",
-                "yuv420p",
-                "-shortest",
-                "-r",
-                str(fps),
-                str(output_file),
-            ],
+            _build_ffmpeg_create_video_command(audio_file, image_file, output_file, fps, use_gpu),
             capture_output=True,
             text=True,
             check=True,
@@ -123,30 +153,7 @@ def create_video(audio_file, image_file, output_file, fps=24, max_height=4096):
         if use_gpu:
             logging.info("Falling back to CPU encoding.")
             subprocess.run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-loop",
-                    "1",
-                    "-i",
-                    str(image_file),
-                    "-i",
-                    str(audio_file),
-                    "-c:v",
-                    "libx264",
-                    "-tune",
-                    "stillimage",
-                    "-c:a",
-                    "aac",
-                    "-b:a",
-                    "192k",
-                    "-pix_fmt",
-                    "yuv420p",
-                    "-shortest",
-                    "-r",
-                    str(fps),
-                    str(output_file),
-                ],
+                _build_ffmpeg_create_video_command(audio_file, image_file, output_file, fps, use_gpu=False),
                 capture_output=True,
                 text=True,
                 check=True,
@@ -197,11 +204,12 @@ def move_down():
 def start_conversion():
     mp3_files = listbox.get(0, tk.END)
     image_file = image_entry.get()
-    output_folder = folder_entry.get()
+    output_folder = folder_entry.get() or str(default_output_folder)
     output_filename = output_name_entry.get().strip()
 
-    if not mp3_files or not image_file or not output_folder or not output_filename:
-        messagebox.showerror("Error", "Please provide all required inputs")
+    ok, missing = _validate_video_inputs(mp3_files, image_file, output_folder, output_filename)
+    if not ok:
+        messagebox.showerror("Error", f"Please provide: {', '.join(missing)}")
         return
 
     # Combine audio files
@@ -299,7 +307,17 @@ def create_app():
     ttk.Button(frame, text="Clear Fields", command=clear_fields, bootstyle=SECONDARY).grid(row=7, column=2, pady=12)
 
     load_config()
+    _autosize_window(root)
     return root
+
+
+def _autosize_window(window, padding_w=24, padding_h=24, min_w=720, min_h=480):
+    """Resize window to fit content + small padding. Shared pattern with main.py."""
+    window.update_idletasks()
+    req_w = max(window.winfo_reqwidth() + padding_w, min_w)
+    req_h = max(window.winfo_reqheight() + padding_h, min_h)
+    window.geometry(f"{req_w}x{req_h}")
+    window.minsize(req_w, req_h)
 
 
 if __name__ == "__main__":

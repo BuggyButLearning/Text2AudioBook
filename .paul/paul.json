@@ -1,15 +1,15 @@
 {
   "name": "Text2AudioBook",
-  "version": "0.0.0",
+  "version": "0.1.0-rc",
   "milestone": {
     "name": "v0.1 Modernization MVP",
     "version": "0.1.0",
-    "status": "in_progress"
+    "status": "code_complete_pending_walkthrough"
   },
   "phase": {
-    "number": 4,
-    "name": "GUI Reliability and UX",
-    "status": "ready_to_plan"
+    "number": 7,
+    "name": "Testing, Validation, and Docs",
+    "status": "complete"
   },
   "loop": {
     "plan": null,
@@ -17,7 +17,7 @@
   },
   "timestamps": {
     "created_at": "2026-05-21T00:00:00Z",
-    "updated_at": "2026-05-21T02:00:00Z"
+    "updated_at": "2026-05-22T00:00:00Z"
   },
   "satellite": {
     "groom": true

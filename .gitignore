@@ -8,3 +8,6 @@ tmp/
 *.mp3
 *.wav
 .paul/phases/**/00-02-pytest.log
+installer/output/
+installer/*.exe
+

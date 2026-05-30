@@ -11,12 +11,78 @@ OPENAI_TTS_MAX_INPUT_CHARS = 4096
 DEFAULT_CHUNK_MAX = 3500
 
 
+SUPPORTED_INPUT_EXTENSIONS = (".txt", ".md", ".markdown")
+
+
+_MD_FENCED_CODE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
+_MD_INLINE_CODE = re.compile(r"`([^`\n]+)`")
+_MD_ATX_HEADER = re.compile(r"^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$", re.MULTILINE)
+_MD_SETEXT_HEADER = re.compile(r"^(.+)\n[=\-]{2,}\s*$", re.MULTILINE)
+_MD_IMAGE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_MD_REF_LINK = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
+_MD_REF_DEFINITION = re.compile(r"^\s*\[[^\]]+\]:\s+\S+.*$", re.MULTILINE)
+_MD_BOLD = re.compile(r"(\*\*|__)(.+?)\1", re.DOTALL)
+_MD_ITALIC = re.compile(r"(?<![\w*])(\*|_)([^*_\n]+?)\1(?![\w*])")
+_MD_STRIKETHROUGH = re.compile(r"~~(.+?)~~", re.DOTALL)
+_MD_LIST_BULLET = re.compile(r"^\s*[-*+]\s+", re.MULTILINE)
+_MD_LIST_NUMBERED = re.compile(r"^\s*\d+\.\s+", re.MULTILINE)
+_MD_BLOCKQUOTE = re.compile(r"^\s*>\s?", re.MULTILINE)
+_MD_HR = re.compile(r"^\s*([-*_])(\s*\1){2,}\s*$", re.MULTILINE)
+_MD_TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$", re.MULTILINE)
+_MD_HTML_TAG = re.compile(r"<[^>]+>")
+_MD_MULTI_BLANK = re.compile(r"\n{3,}")
+
+
+def strip_markdown(text):
+    """Strip Markdown syntax so TTS does not vocalize hashes, asterisks, etc.
+
+    Conservative regex-based pass (no markdown library dep). Order matters:
+    fenced code first (so its contents aren't processed), then references,
+    then inline emphasis. Pipes from tables become spaces; tables read as
+    space-separated cells.
+    """
+    if not text:
+        return text
+    out = _MD_FENCED_CODE.sub("", text)
+    out = _MD_REF_DEFINITION.sub("", out)
+    out = _MD_TABLE_SEPARATOR.sub("", out)
+    out = _MD_SETEXT_HEADER.sub(r"\1", out)
+    out = _MD_ATX_HEADER.sub(r"\1", out)
+    out = _MD_HR.sub("", out)
+    out = _MD_IMAGE.sub(r"\1", out)
+    out = _MD_LINK.sub(r"\1", out)
+    out = _MD_REF_LINK.sub(r"\1", out)
+    out = _MD_BOLD.sub(r"\2", out)
+    out = _MD_ITALIC.sub(r"\2", out)
+    out = _MD_STRIKETHROUGH.sub(r"\1", out)
+    out = _MD_INLINE_CODE.sub(r"\1", out)
+    out = _MD_LIST_BULLET.sub("", out)
+    out = _MD_LIST_NUMBERED.sub("", out)
+    out = _MD_BLOCKQUOTE.sub("", out)
+    out = _MD_HTML_TAG.sub("", out)
+    # Table pipes -> spaces (after separator rows already removed).
+    out = out.replace("|", " ")
+    out = _MD_MULTI_BLANK.sub("\n\n", out)
+    return out.strip()
+
+
+def _is_markdown_path(file_path):
+    lower = str(file_path).lower()
+    return lower.endswith(".md") or lower.endswith(".markdown")
+
+
 def read_text_from_file(file_path):
-    """Reads and returns the content of a text file."""
+    """Read text from file. Strips Markdown syntax if extension is .md / .markdown
+    so the TTS engine does not vocalize hashes, asterisks, code fences, etc."""
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
-        logging.info("Successfully read text from input file.")
+        if _is_markdown_path(file_path):
+            content = strip_markdown(content)
+            logging.info("Successfully read + stripped Markdown from input file.")
+        else:
+            logging.info("Successfully read text from input file.")
         return content
     except Exception as e:
         logging.error(f"Error reading the input file: {e}")

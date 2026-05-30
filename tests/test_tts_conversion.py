@@ -210,6 +210,25 @@ class TestConvertTextChunkOllamaBranch:
         result = convert_text_chunk_to_speech("hello", 0, s, tmp_path, "20260521_000000", retries=1)
         assert result is None
 
+    def test_ollama_no_endpoint_error_mentions_kokoro(self, tmp_path, caplog):
+        """Phase 6: error message points the user toward Kokoro as the v0.1 local
+        synthesis path, since Ollama doesn't expose a standard TTS endpoint."""
+        import logging as _logging
+
+        s = types.SimpleNamespace(
+            provider="Ollama",
+            model="bark-tiny",
+            voice="alloy",
+            speed=1.0,
+            response_format="mp3",
+            openai_api_key=None,
+            max_concurrency=1,
+        )
+        with caplog.at_level(_logging.ERROR):
+            convert_text_chunk_to_speech("hello", 0, s, tmp_path, "20260521_000000", retries=1)
+        log_text = " | ".join(r.getMessage() for r in caplog.records)
+        assert "Kokoro" in log_text
+
 
 class TestConcatenateAudioFiles:
     """

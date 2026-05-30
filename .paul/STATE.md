@@ -5,28 +5,28 @@
 See: .paul/PROJECT.md (updated 2026-05-21)
 
 **Core value:** Convert text files into high-quality audiobook MP3s with a choice of hosted (OpenAI) or local (Ollama / Kokoro) TTS providers, without editing code. (VibeVoice deferred to v0.2.)
-**Current focus:** v0.1 Modernization MVP — Phase 4 (GUI Reliability and UX)
+**Current focus:** v0.1 Modernization MVP — Phase 4 (GUI Reliability and UX) UNIFY ✓; awaiting human-verify GUI walkthrough
 
 ## Current Position
 
 Milestone: v0.1 Modernization MVP (v0.1.0)
-Phase: 4 of 11 (GUI Reliability and UX) — Ready to plan
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-21 — Phase 3 transition complete: PROJECT.md "Validated" + 2 Phase 3 key decisions promoted; ROADMAP Phase 3 marked Complete; paul.json advanced to phase 4; phase commit pending stage+commit.
+Phase: 4 of 11 (GUI Reliability and UX) — APPLY ✓ + UNIFY ✓
+Plan: 04-01 complete; live GUI walkthrough is the only remaining gate before phase transition
+Status: PLAN ✓ AUDIT ✓ APPLY ✓ UNIFY ✓; human-verify checkpoint pending (user runs `python main.py`)
+Last activity: 2026-05-22 — APPLY landed registry-driven dropdown + Kokoro pre-thread guard (user-spotted drift bug); 228 tests pass in 0.64s; SUMMARY.md written
 
 Progress:
-- Milestone: [█████░░░░░] 50% (5 of 10 active v0.1 phases done; Phase 6.3 deferred to v0.2)
-- Phase 4: [░░░░░░░░░░] 0% (planning to start)
+- Milestone: [█████░░░░░] 50% (5 of 10 active v0.1 phases done; Phase 4 awaits walkthrough)
+- Phase 4: [████████░░] 80% (PLAN ✓ AUDIT ✓ APPLY ✓ UNIFY ✓; only live walkthrough remains)
 
 ## Loop Position
 
-Current loop state:
+Current loop state (04-01):
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Idle — ready for Phase 4 PLAN]
+  ✓        ✓        ✓     [228 tests pass; walkthrough is the only remaining gate before phase transition]
 ```
-Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete · Phase 2.1: ✅ Complete.
+Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete · Phase 2.1: ✅ Complete · Phase 3: ✅ Complete.
 
 ## Accumulated Context
 
@@ -61,9 +61,15 @@ Phase 0: ✅ Complete · Phase 1: ✅ Complete · Phase 2: ✅ Complete · Phase
 | Phase 2.1 transition complete 2026-05-21: PROJECT.md gained 3 "Validated (Shipped)" entries + 5 Phase 2.1 Key Decisions; ROADMAP Phase 2.1 marked Complete; Phase 3 promoted to Planning; paul.json advanced to phase 3; git commit `74bfd8d` created locally (not pushed) | Phase 2.1 → Phase 3 | Milestone progress: 4/10 active v0.1 phases done. Push pending user approval (HITL on git push) |
 | 03-01 audited 2026-05-21: verdict conditionally acceptable; 0 must-have + 4 strongly-recommended upgrades applied; 3 deferred | Phase 3 | S1 corrected off-by-8 baseline test count (20 existing, not 12); S2 `_locate` DEBUG-log on fallback path (defensive observability); S3 `test_distinct_chunks_have_distinct_positions` (traps [0,0,0] regression); S4 reconstruction-test hardening (non-empty chunks + source-slice length floor). AUDIT.md at `.paul/phases/03-text-processing-improvements/03-01-AUDIT.md` |
 | 03-01 applied 2026-05-21: text_processing.py refactored to forward-cursor `_locate` (position-accuracy fix for duplicate substrings); OPENAI_TTS_MAX_INPUT_CHARS=4096 + DEFAULT_CHUNK_MAX=3500 constants exported; reconstruction-invariant test pattern + 16 new tests across TestSplitTextBudget/Positions/EdgeCases; 195 tests pass in 0.76s; first-pass green | Phase 3 | Phase 4 GUI progress bar can trust positions[] (no duplicate-substring confusion). SUMMARY.md + pytest log at `.paul/phases/03-text-processing-improvements/`. |
+| Phase 3 transition complete 2026-05-21: PROJECT.md gained 1 "Validated (Shipped)" entry + 2 Phase 3 Key Decisions; ROADMAP Phase 3 marked Complete; Phase 4 promoted to Planning; paul.json advanced to phase 4; git commit `8189909` created locally (not pushed) | Phase 3 → Phase 4 | Milestone progress: 5/10 active v0.1 phases done (50%). Push pending user approval (HITL on git push) |
+| 04-01 audited 2026-05-21: verdict conditionally acceptable; 0 must-have + 3 strongly-recommended upgrades applied; 3 deferred | Phase 4 | S1 `_conversion_in_progress` flag guards against fast-double-click on Start (atomic via Tk single-threaded event loop); S2 `TestRunConversionWorker` smoke test with fake root (catches chokepoint-bypass regression); S3 `_thread_safe_status` docstring documents Tkinter main-thread contract. Deferred: window-close-during-conversion cleanup → Phase 5; provider-change refresh threading → Phase 7; programmatic invalidate_cache assertion → low ROI. AUDIT.md at `.paul/phases/04-gui-reliability-and-ux/04-01-AUDIT.md` |
+| 04-01 applied 2026-05-22: threaded conversion via `threading.Thread(_run_conversion_worker)` + `_thread_safe_status` chokepoint; `_conversion_in_progress` S1 guard; `refresh_models` invalidate-then-discover with `use_cache=False`; `set_controls_enabled` locks all dropdowns + capability-driven voice menu; enumerated validation errors; 228 tests pass in 0.64s; main.py only file changed (providers/settings/model_discovery/tts_conversion/text_processing untouched) | Phase 4 | Background-threading + registry-driven UX landed. SUMMARY.md + pytest log at `.paul/phases/04-gui-reliability-and-ux/`. Live walkthrough pending. |
+| 04-01 mid-phase scope add 2026-05-22: registry-driven `provider_options = list(list_providers())` replaces hardcoded `providers = ["OpenAI", "Ollama"]` (user spotted drift — Kokoro was registered but never surfaced in GUI); Kokoro pre-thread guard in `start_conversion` shows "Phase 6.2 pending" messagebox; capability-driven `voice_menu` repopulates from `cap.voices` on provider change; `_format_discovery_status` FALLBACK semantic split (no-error → "registry list", error → "discovery failed"); +4 tests (TestRegistryDrivenProviderOptions + TestKokoroSynthesisGuard + Kokoro voice test) | Phase 4 | Drift bug class eliminated; future provider additions to PROVIDER_REGISTRY auto-surface in GUI without main.py edit. VibeVoice stays out (still absent from registry per Phase 0 §14.2(1)). |
+| 04-01 unified 2026-05-22: SUMMARY.md written documenting 33-test delta (195 → 228), AC-1 through AC-6 PASS, AC-7 walkthrough pending; 4 deferred items logged (Cancel Conversion button, progress %, OpenAI exception discrimination, Kokoro quality preset semantics) | Phase 4 | Loop closed at code level. Transition workflow + git commit blocked on walkthrough approval. |
 
 ### Git State
-Last commit: `74bfd8d` — feat(02.1-model-discovery-and-selection): close Phase 2.1 with extracted discovery + cache + Ollama allowlist
+Last commit: `8189909` — feat(03-text-processing-improvements): close Phase 3 with position-accuracy fix + char-budget constants
+Phase 3 commit: `8189909` — feat(03-text-processing-improvements): close Phase 3 with position-accuracy fix + char-budget constants
 Phase 2.1 commit: `74bfd8d` — feat(02.1-model-discovery-and-selection): close Phase 2.1 with extracted discovery + cache + Ollama allowlist
 Phase 2 commit: `92a902e` — feat(02-tts-engine-modernization): close Phase 2 with registry-driven TTS + non-deprecated streaming SDK
 Pre-PAUL baseline: `f2ff098` — chore(pre-paul): land in-progress modernization edits as Phase 2-5 baseline
@@ -94,10 +100,10 @@ Working tree: clean except IDE noise (.vscode/, test_tracking/.vscode.configs.im
 
 ## Session Continuity
 
-Last session: 2026-05-21
-Stopped at: Phase 3 complete; transitioned to Phase 4 (GUI Reliability and UX). Phase 3 git commit pending.
-Next action: `/paul:plan` for Phase 4 (GUI Reliability and UX)
-Resume file: .paul/ROADMAP.md
+Last session: 2026-05-22
+Stopped at: Phase 4 APPLY ✓ UNIFY ✓; 228 tests pass; SUMMARY.md written. Awaiting live GUI walkthrough (user runs `python main.py`) before phase transition + commit.
+Next action: User runs `conda activate text2audiobook && python main.py`, walks through AC-7 checklist (registry-driven dropdown shows OpenAI/Ollama/Kokoro; Kokoro Start → "Phase 6.2 pending" dialog; window stays responsive during OpenAI conversion; dropdowns locked mid-conversion). On "approved": run transition (PROJECT.md promote, ROADMAP Phase 4 Complete, paul.json → phase 5, git commit `feat(04-gui-reliability-and-ux): ...`).
+Resume file: .paul/phases/04-gui-reliability-and-ux/04-01-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*

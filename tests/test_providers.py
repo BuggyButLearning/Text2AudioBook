@@ -102,10 +102,78 @@ class TestKokoroCapability:
     def test_hf_model_revision_is_sha_or_tag(self, cap):
         rev = cap.hf_model_revision
         assert rev is not None
-        sha_match = re.fullmatch(r"[0-9a-f]{40,64}", rev)
+        # Git SHA is exactly 40 hex chars; broader 40-64 range let a 64-char fake
+        # slip through and 404 against HF. Tightened to exact git SHA length.
+        sha_match = re.fullmatch(r"[0-9a-f]{40}", rev)
         semver_match = re.fullmatch(r"v?\d+\.\d+\.\d+([+-][\w.]+)?", rev)
         literal_match = rev in {"main", "master"}
         assert sha_match or semver_match or literal_match, f"unexpected revision schema: {rev!r}"
+
+    def test_hf_model_revision_is_exactly_40_hex_chars(self, cap):
+        """Regression guard: 2026-05-22 the pinned revision was a 64-char
+        SHA256-shaped fake that 404'd against HF (Revision Not Found).
+        Git SHAs are exactly 40 hex chars."""
+        rev = cap.hf_model_revision
+        # Only enforce length-check on values that LOOK like a SHA (all-hex).
+        if rev and all(c in "0123456789abcdef" for c in rev):
+            assert len(rev) == 40, (
+                f"git SHA must be exactly 40 hex chars; got {len(rev)} chars: {rev!r}. "
+                "If you intended a different value (semver tag, branch literal), "
+                "use that form instead of an all-hex non-40-char string."
+            )
+
+    def test_pinned_revision_is_the_known_good_value(self, cap):
+        """Locks the specific SHA fetched from HF 2026-05-22. Bumping requires
+        re-fetching from https://huggingface.co/api/models/hexgrad/Kokoro-82M
+        and updating this assertion together with the registry value."""
+        assert cap.hf_model_revision == "f3ff3571791e39611d31c381e3a41a3af07b4987"
+
+
+class TestRevisionValidator:
+    """Regression guards on providers._validate_revision so future fakes blow up
+    at import time (not at first download)."""
+
+    def test_64_char_hex_now_rejected(self):
+        """Bug 2026-05-22: a 64-char SHA256-shaped value passed the old
+        [40,64] regex and 404'd against HF. Now: 40 chars exact."""
+        import providers
+        with pytest.raises(ValueError, match="does not match accepted schema"):
+            providers._validate_revision(
+                "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+                repo="hexgrad/Kokoro-82M",
+            )
+
+    def test_40_char_git_sha_accepted(self):
+        import providers
+        providers._validate_revision("f3ff3571791e39611d31c381e3a41a3af07b4987", repo="x/y")
+
+    def test_main_literal_accepted(self):
+        import providers
+        providers._validate_revision("main", repo="x/y")
+
+    def test_semver_accepted(self):
+        import providers
+        providers._validate_revision("v1.2.3", repo="x/y")
+
+    def test_none_accepted(self):
+        import providers
+        providers._validate_revision(None, repo="x/y")
+
+    def test_39_chars_rejected(self):
+        import providers
+        with pytest.raises(ValueError):
+            providers._validate_revision("a" * 39, repo="x/y")
+
+    def test_41_chars_rejected(self):
+        import providers
+        with pytest.raises(ValueError):
+            providers._validate_revision("a" * 41, repo="x/y")
+
+    def test_uppercase_hex_rejected(self):
+        """git SHAs are lowercase hex; uppercase indicates fabrication."""
+        import providers
+        with pytest.raises(ValueError):
+            providers._validate_revision("F" * 40, repo="x/y")
 
 
 class TestGetProviderCapability:

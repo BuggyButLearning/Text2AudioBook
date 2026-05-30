@@ -1,11 +1,13 @@
 from text_processing import (
     DEFAULT_CHUNK_MAX,
     OPENAI_TTS_MAX_INPUT_CHARS,
+    SUPPORTED_INPUT_EXTENSIONS,
     _chunk_preview,
     _normalize_text,
     _sentence_split,
     read_text_from_file,
     split_text,
+    strip_markdown,
 )
 
 
@@ -19,6 +21,143 @@ class TestReadTextFromFile:
         # CHARACTERIZED — current behavior returns None on error rather than raising.
         result = read_text_from_file(str(tmp_path / "nope.txt"))
         assert result is None
+
+    def test_reads_md_file_and_strips_markdown(self, tmp_path):
+        p = tmp_path / "sample.md"
+        p.write_text("# Title\n\n**Bold** and *italic*.", encoding="utf-8")
+        out = read_text_from_file(str(p))
+        assert "Title" in out
+        assert "#" not in out
+        assert "**" not in out
+        assert "Bold" in out
+        assert "italic" in out
+
+    def test_reads_markdown_extension_strips(self, tmp_path):
+        p = tmp_path / "sample.markdown"
+        p.write_text("# Header", encoding="utf-8")
+        assert read_text_from_file(str(p)).strip() == "Header"
+
+    def test_txt_file_left_unchanged(self, tmp_path):
+        """.txt path must NOT strip — # is valid text content there."""
+        p = tmp_path / "sample.txt"
+        p.write_text("# this is not a header", encoding="utf-8")
+        assert read_text_from_file(str(p)) == "# this is not a header"
+
+
+class TestSupportedInputExtensions:
+    def test_includes_txt_and_md(self):
+        assert ".txt" in SUPPORTED_INPUT_EXTENSIONS
+        assert ".md" in SUPPORTED_INPUT_EXTENSIONS
+        assert ".markdown" in SUPPORTED_INPUT_EXTENSIONS
+
+
+class TestStripMarkdown:
+    def test_atx_header_unwrapped(self):
+        assert strip_markdown("# Hello").strip() == "Hello"
+        assert strip_markdown("### Sub").strip() == "Sub"
+
+    def test_setext_header_unwrapped(self):
+        out = strip_markdown("Title\n=====")
+        assert "Title" in out
+        assert "=" not in out
+
+    def test_bold_unwrapped(self):
+        assert "Bold" in strip_markdown("**Bold** text")
+        assert "**" not in strip_markdown("**Bold** text")
+
+    def test_italic_unwrapped(self):
+        assert "italic" in strip_markdown("*italic*")
+        assert "*" not in strip_markdown("*italic*")
+
+    def test_strikethrough_unwrapped(self):
+        out = strip_markdown("~~gone~~")
+        assert "gone" in out
+        assert "~" not in out
+
+    def test_inline_code_unwrapped(self):
+        out = strip_markdown("Use `foo()` to call")
+        assert "foo()" in out
+        assert "`" not in out
+
+    def test_fenced_code_removed(self):
+        text = "Before\n\n```python\nprint('hi')\n```\n\nAfter"
+        out = strip_markdown(text)
+        assert "Before" in out
+        assert "After" in out
+        assert "print" not in out
+        assert "```" not in out
+
+    def test_link_keeps_text_drops_url(self):
+        out = strip_markdown("See [the docs](https://example.com) here")
+        assert "the docs" in out
+        assert "https://example.com" not in out
+        assert "[" not in out
+
+    def test_image_keeps_alt_drops_url(self):
+        out = strip_markdown("![cat photo](cat.jpg)")
+        assert "cat photo" in out
+        assert "cat.jpg" not in out
+
+    def test_list_markers_removed(self):
+        out = strip_markdown("- one\n- two\n- three")
+        assert "one" in out
+        assert "two" in out
+        assert "- " not in out
+
+    def test_numbered_list_markers_removed(self):
+        out = strip_markdown("1. one\n2. two")
+        assert "one" in out
+        assert "1." not in out
+
+    def test_blockquote_stripped(self):
+        out = strip_markdown("> quoted line")
+        assert "quoted line" in out
+        assert ">" not in out
+
+    def test_hr_removed(self):
+        out = strip_markdown("Before\n\n---\n\nAfter")
+        assert "Before" in out
+        assert "After" in out
+        assert "---" not in out
+
+    def test_html_tag_removed(self):
+        out = strip_markdown("Hello <span>world</span>")
+        assert "Hello" in out
+        assert "world" in out
+        assert "<" not in out
+
+    def test_table_separator_and_pipes(self):
+        text = "| a | b |\n|---|---|\n| 1 | 2 |"
+        out = strip_markdown(text)
+        assert "a" in out and "b" in out
+        assert "1" in out and "2" in out
+        assert "|" not in out
+        assert "---" not in out
+
+    def test_empty_input_returns_empty(self):
+        assert strip_markdown("") == ""
+        assert strip_markdown(None) is None
+
+    def test_plain_text_unchanged(self):
+        out = strip_markdown("Just a sentence with no markdown.")
+        assert out == "Just a sentence with no markdown."
+
+    def test_combined_real_world_sample(self):
+        sample = (
+            "# Chapter 1\n\n"
+            "Once upon a *time*, there was a **brave** knight.\n\n"
+            "- He had a sword\n"
+            "- And a shield\n\n"
+            "> 'Onward!' he cried.\n\n"
+            "See [the map](map.png) for details.\n\n"
+            "```\nignored code block\n```\n"
+        )
+        out = strip_markdown(sample)
+        for token in ["#", "**", "```", "[", "]", "(", "> "]:
+            assert token not in out, f"residual markdown token {token!r} in output"
+        for word in ["Chapter 1", "time", "brave", "knight", "sword", "shield", "Onward", "the map"]:
+            assert word in out, f"missing content word {word!r}"
+        assert "ignored code block" not in out
 
 
 class TestNormalizeText:

@@ -112,6 +112,77 @@ class TestOllamaDiscovery:
         assert "connection refused" in r.error
 
 
+class TestOllamaReachable:
+    """Phase 6: pre-flight reachability probe distinct from model discovery.
+    Separates 'Ollama not running' (start `ollama serve`) from 'Ollama running
+    but no TTS model' (pull a model)."""
+
+    def test_returns_true_on_2xx(self):
+        def fake_get(*_a, **_kw):
+            return types.SimpleNamespace(status_code=200)
+        ok, reason = model_discovery.ollama_reachable("http://localhost:11434", request_fn=fake_get)
+        assert ok is True
+        assert reason is None
+
+    def test_returns_false_on_non_2xx(self):
+        def fake_get(*_a, **_kw):
+            return types.SimpleNamespace(status_code=500)
+        ok, reason = model_discovery.ollama_reachable("http://localhost:11434", request_fn=fake_get)
+        assert ok is False
+        assert "500" in (reason or "")
+
+    def test_returns_false_with_serve_hint_on_connection_refused(self):
+        import requests as _req
+
+        def fake_get(*_a, **_kw):
+            raise _req.exceptions.ConnectionError("refused")
+        ok, reason = model_discovery.ollama_reachable("http://localhost:11434", request_fn=fake_get)
+        assert ok is False
+        assert "ollama serve" in (reason or "")
+
+    def test_returns_false_on_connect_timeout(self):
+        import requests as _req
+
+        def fake_get(*_a, **_kw):
+            raise _req.exceptions.ConnectTimeout("slow")
+        ok, reason = model_discovery.ollama_reachable("http://localhost:11434", request_fn=fake_get)
+        assert ok is False
+        assert "timed out" in (reason or "")
+
+    def test_canonicalizes_url_before_probe(self):
+        captured = {}
+
+        def fake_get(url, *_a, **_kw):
+            captured["url"] = url
+            return types.SimpleNamespace(status_code=200)
+        model_discovery.ollama_reachable("http://localhost:11434/", request_fn=fake_get)
+        assert captured["url"] == "http://localhost:11434/api/version"
+
+    def test_default_url_used_when_none(self):
+        captured = {}
+
+        def fake_get(url, *_a, **_kw):
+            captured["url"] = url
+            return types.SimpleNamespace(status_code=200)
+        model_discovery.ollama_reachable(None, request_fn=fake_get)
+        assert captured["url"] == "http://localhost:11434/api/version"
+
+
+class TestOllamaConnectionRefinedError:
+    """Phase 6: connection-refused branch surfaces the `ollama serve` hint
+    in DiscoveryResult.error (separate from generic exception path)."""
+
+    def test_connection_error_surfaces_serve_hint(self, monkeypatch):
+        import requests as _req
+
+        def boom(*_a, **_kw):
+            raise _req.exceptions.ConnectionError("refused")
+        monkeypatch.setattr(model_discovery.requests, "get", boom)
+        r = discover_models("Ollama", ollama_base_url="http://localhost:11434")
+        assert r.source == Source.EMPTY
+        assert "ollama serve" in (r.error or "")
+
+
 class TestCacheBehavior:
     def test_cache_hit_skips_network(self, monkeypatch):
         openai_mod = pytest.importorskip("openai")
